@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -31,11 +31,11 @@ static int GetLoginInfoNonHidl(const struct ucred *cr, int fd, uint8_t *buf, uns
     int ret;
 
     ret = TeeGetNativeCert(cr->pid, cr->uid, &bufLen, buf);
-    if (ret) {
-        tloge("CERT check failed<%d>.\n", ret);
+    if (ret != 0) {
+        tloge("CERT check failed<%d>\n", ret);
         /* Inform the driver the cert could not be set */
         ret = ioctl(fd, TC_NS_CLIENT_IOCTL_LOGIN, NULL);
-        if (ret) {
+        if (ret != 0) {
             tloge("Failed to set login information for client err=%d!\n", ret);
         }
         return -1;
@@ -77,13 +77,13 @@ int SendLoginInfo(const struct ucred *cr, const CaRevMsg *caRevInfo, int fd)
         ret = -1;
     }
 
-    if (ret) {
+    if (ret != 0) {
         tloge("get cert failed\n");
         goto END;
     }
 
     ret = ioctl(fd, TC_NS_CLIENT_IOCTL_LOGIN, buf);
-    if (ret) {
+    if (ret != 0) {
         tloge("Failed set login info for client err=%d!\n", ret);
     }
 

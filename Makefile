@@ -5,7 +5,7 @@ LIBC_SEC   := libboundscheck
 TARGET_LOG := tlogcat
 TARGET_LIBSEC := libboundscheck.so
 
-LIB_CFLAGS := -DSEC_STORAGE_DATA_KUNPENG_PATH -DSECURITY_AUTH_ENHANCE
+LIB_CFLAGS := -DSEC_STORAGE_DATA_KUNPENG_PATH -DSECURITY_AUTH_ENHANCE -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
 LIB_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/teecd/  -Isrc/authentication/
 LIB_CFLAGS += -lboundscheck -Llibboundscheck/lib -shared
 LIB_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIC -D_FORTIFY_SOURCE=2 -O2
@@ -47,9 +47,15 @@ $(TARGET_LIB):$(TARGET_LIBSEC) $(LIB_SOURCES)
 
 
 APP_CFLAGS := -DSEC_STORAGE_DATA_KUNPENG_PATH -D_GNU_SOURCE -DSECURITY_AUTH_ENHANCE -DCONFIG_AGENT_FS
+APP_CFLAGS += -DDYNAMIC_DRV_DIR=\"/var/itrustee/tee_dynamic_drv/\" -DDYNAMIC_SRV_DIR=\"/var/itrustee/tee_dynamic_srv/\" -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
 APP_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/teecd/  -Isrc/authentication/
 APP_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
 APP_LDFLAGS += -lboundscheck -Llibboundscheck/lib -lpthread -lcrypto
+
+CFG_ENG = user
+ifneq ($(strip $(CFG_ENG)), user)
+APP_CFLAGS += -DDEF_ENG
+endif
 
 APP_SOURCES := src/teecd/tee_agent.c \
 			   src/teecd/tee_ca_daemon.c \
@@ -58,6 +64,7 @@ APP_SOURCES := src/teecd/tee_agent.c \
 			   src/teecd/misc_work_agent.c \
 			   src/teecd/tee_ca_auth.c \
 			   src/teecd/system_ca_auth.c \
+			   src/teecd/tee_load_dynamic.c \
 			   src/authentication/tee_get_native_cert.c \
 			   src/authentication/tee_auth_common.c
 
@@ -73,16 +80,13 @@ $(TARGET_APP): $(TARGET_LIBSEC) $(APP_SOURCES)
 #############################
 ## tlogcat
 #############################
-LOG_SOURCES := src/tlogcat/read_ktrace.c \
-	src/tlogcat/tarzip.c  \
+LOG_SOURCES := src/tlogcat/tarzip.c  \
+	src/tlogcat/sys_syslog_cfg.c \
+        src/tlogcat/proc_tag.c       \
 	src/tlogcat/tlogcat.c
 
 LOG_CFLAGS += -Werror -Wall -Wextra -DTLOGCAT_SYS_LOG
-LOG_CFLAGS += -DTEE_KTRACE_DUMP
-LOG_CFLAGS += -DLOG_PATH_TEE=\"/var/log/tee/\"
-LOG_CFLAGS += -DLOG_PATH_BASE=\"/var/log/\"
-LOG_CFLAGS += -DLOG_TMPPATH_TEE=\"/var/log/tee/_tmp/\"
-LOG_CFLAGS += -DAID_SYSTEM=0
+LOG_CFLAGS += -DTEE_LOG_PATH_BASE=\"/var/log\"
 
 LOG_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
 LOG_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/tlogcat/

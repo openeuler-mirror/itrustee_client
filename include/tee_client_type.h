@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2013-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2013-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -13,30 +13,13 @@
 #ifndef _TEE_CLIENT_TYPE_H_
 #define _TEE_CLIENT_TYPE_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stddef.h>
 #include <semaphore.h>
 #include "tee_client_list.h"
 #include "tee_client_constants.h"
-
-#ifndef __cplusplus
-#ifndef bool
-#define bool    uint8_t
-#endif
-#endif
-
-#ifndef true
-#define true    1
-#endif
-
-#ifndef false
-#define false   0
-#endif
-
-#ifndef NULL
-#define NULL 0
-#endif
 
 typedef enum TEEC_ReturnCode TEEC_Result;
 

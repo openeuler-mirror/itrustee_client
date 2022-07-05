@@ -10,12 +10,17 @@
  * See the Mulan PSL v2 for more details.
  */
 
-#ifndef TEE_AUTH_CA_H
-#define TEE_AUTH_CA_H
+#ifndef TEE_CLIENT_LOG_H
+#define TEE_CLIENT_LOG_H
 
-#include <sys/socket.h>
-#include "tee_auth_common.h"
+#include <stdio.h>
 
-int SendLoginInfo(const struct ucred *cr, const CaRevMsg *caRevInfo, int fd);
+#ifdef TEEC_DEBUG
+#define TEEC_Debug(fmt, args...) printf("%s: " fmt, __func__, ## args)
+#else
+#define TEEC_Debug(...)
+#endif
+
+#define TEEC_Error(fmt, args...) printf("%s: " fmt, __func__, ## args)
 
 #endif

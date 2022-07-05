@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2013-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2013-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -17,10 +17,15 @@
 #define LOG_TAG NULL
 #endif
 
+#ifdef LOG_NDEBUG
+#undef LOG_NDEBUG
+#endif
+#define LOG_NDEBUG 0
+
 #include <string.h>
 #include "tee_client_type.h"
 #include "tee_client_ext_api.h"
-#include <tee_client_log.h>
+#include "tee_client_log.h"
 
 #ifdef __cplusplus
 extern "C" {

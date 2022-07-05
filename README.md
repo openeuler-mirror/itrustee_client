@@ -1,4 +1,4 @@
-# itrustee client
+# client
 
 #### 介绍
 该目录下文件包含3个功能组件，分别是:libteec.so、teecd、tlogcat.

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2013-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2013-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -18,7 +18,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <pthread.h>
-
+#include <sys/time.h>
+#include <time.h>
 #include "tc_ns_client.h"
 #include "tee_client_api.h"
 #include "tee_log.h"
@@ -64,7 +65,7 @@ static int AgentInit(unsigned int id, void **control)
     args.id         = id;
     args.bufferSize = TRANS_BUFF_SIZE;
     ret             = ioctl(fd, (int)TC_NS_CLIENT_IOCTL_REGISTER_AGENT, &args);
-    if (ret) {
+    if (ret != 0) {
         (void)close(fd);
         tloge("ioctl failed\n");
         return -1;
@@ -83,7 +84,7 @@ static void AgentExit(unsigned int id, int fd)
     }
 
     ret = ioctl(fd, (int)TC_NS_CLIENT_IOCTL_UNREGISTER_AGENT, id);
-    if (ret) {
+    if (ret != 0) {
         tloge("ioctl failed\n");
     }
 
@@ -96,7 +97,7 @@ static struct SecAgentControlType *g_secLoadAgentControl = NULL;
 
 static int g_fsThreadFlag = 0;
 
-static int ProcessAgentInit()
+static int ProcessAgentInit(void)
 {
     int ret;
 #ifdef CONFIG_AGENT_FS
@@ -138,7 +139,7 @@ ERROR1:
     return -1;
 }
 
-static void ProcessAgentExit()
+static void ProcessAgentExit(void)
 {
     if (g_fsThreadFlag == 1) {
         AgentExit(AGENT_FS_ID, g_fsFd);
@@ -155,6 +156,63 @@ static void ProcessAgentExit()
     g_secLoadAgentControl = NULL;
 }
 
+#define SEC_MIN         0xFFFFF
+#define NSEC_PER_MILLIS 1000000
+static int SyncSysTimeToSecure(void)
+{
+    int ret;
+    TC_NS_Time tcNsTime;
+    struct timespec realTime;
+    struct timespec sysTime;
+
+    ret = clock_gettime(CLOCK_REALTIME, &realTime);
+    if (ret != 0) {
+        tloge("Get real time failed, ret=0x%x\n", ret);
+        return ret;
+    }
+    
+    ret = clock_gettime(CLOCK_MONOTONIC, &sysTime);
+    if (ret != 0) {
+        tloge("Get system time failed, ret=0x%x\n", ret);
+        return ret;
+    }
+
+    if (realTime.tv_sec <= sysTime.tv_sec) {
+        tlogd("Real time is not ready\n");
+        return -1;
+    }
+    tcNsTime.seconds = (uint32_t)realTime.tv_sec;
+    tcNsTime.millis = realTime.tv_nsec / NSEC_PER_MILLIS;
+
+    int fd = open(TC_NS_CLIENT_DEV_NAME, O_RDWR);
+    if (fd < 0) {
+        tloge("Failed to open %s: %d\n", TC_NS_CLIENT_DEV_NAME, errno);
+        return fd;
+    }
+    ret = ioctl(fd, (int)TC_NS_CLIENT_IOCTL_SYC_SYS_TIME, &tcNsTime);
+    if (ret != 0) {
+        tloge("Failed to send sys time to teeos\n");
+    }
+
+    close(fd);
+    return ret;
+}
+
+void TrySyncSysTimeToSecure(void)
+{
+    int ret;
+    static int syncSysTimed = 0;
+
+    if (syncSysTimed == 0) {
+        ret = SyncSysTimeToSecure();
+        if (ret != 0) {
+            tloge("Failed to sync sys time to secure\n");
+        } else {
+            syncSysTimed = 1;
+        }
+    }
+}
+
 int main(void)
 {
     pthread_t fsThread               = -1;
@@ -167,9 +225,12 @@ int main(void)
     }
 
     int ret = ProcessAgentInit();
-    if (ret) {
+    if (ret != 0) {
         return ret;
     }
+
+    /* sync time to tee should be before ta&driver load to tee for v3.1 signature */
+    TrySyncSysTimeToSecure();
 
     (void)pthread_create(&caDaemonThread, NULL, CaServerWorkThread, &type);
 

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2013-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2013-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -69,9 +69,10 @@ enum TEEC_ReturnCodeOrigin {
 };
 
 enum TEEC_SharedMemCtl {
-    TEEC_MEM_INPUT = 0x1,  /* input type of memroy */
-    TEEC_MEM_OUTPUT = 0x2, /* output type of memory */
-    TEEC_MEM_INOUT = 0x3,  /* memory is used as both input and output */
+    TEEC_MEM_INPUT = 0x1,        /* input type of memroy */
+    TEEC_MEM_OUTPUT = 0x2,       /* output type of memory */
+    TEEC_MEM_INOUT = 0x3,        /* memory is used as both input and output */
+    TEEC_MEM_SHARED_INOUT = 0x4, /* no copy shared memory */
 };
 
 enum TEEC_ParamType {
@@ -85,6 +86,7 @@ enum TEEC_ParamType {
                                        refer TEEC_TempMemoryReference */
     TEEC_ION_INPUT = 0x08,  /* input type of icon memory reference, refer TEEC_IonReference */
     TEEC_ION_SGLIST_INPUT = 0x09, /* input type of ion memory block reference, refer TEEC_IonSglistReference */
+    TEEC_MEMREF_SHARED_INOUT = 0x0a, /* no copy mem */
     TEEC_MEMREF_WHOLE = 0xc, /* use whole memory block, refer TEEC_RegisteredMemoryReference */
     TEEC_MEMREF_PARTIAL_INPUT = 0xd, /* input type of memory reference, refer TEEC_RegisteredMemoryReference */
     TEEC_MEMREF_PARTIAL_OUTPUT = 0xe, /* output type of memory reference, refer TEEC_RegisteredMemoryReference */

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2018-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2018-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -137,7 +137,6 @@ int TeeGetNativeCert(int caPid, unsigned int caUid, uint32_t *len, uint8_t *buff
         return INVLIAD_PARAM;
     }
     inputLen = *len;
-    tlogd("CA pid is %d, uid is %u\n", caPid, caUid);
 
     ret = TeeGetPkgName(caPid, path, sizeof(path));
     if (ret != 0) {
