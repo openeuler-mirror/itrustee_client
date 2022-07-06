@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2014-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2014-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -14,6 +14,7 @@
 #define TARZIP_H
 
 #include <stdint.h>
+#include <unistd.h>
 
-void TarZipFiles(uint32_t nameCount, const char **inputNames, const char *outputName);
+void TarZipFiles(uint32_t nameCount, const char **inputNames, const char *outputName, gid_t pathGroup);
 #endif

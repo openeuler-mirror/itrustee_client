@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2014-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2014-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -66,7 +66,7 @@ static int32_t WriteOneUint(size_t startIndex, size_t unitLen, const char *input
 
     for (i = 0; i < unitLen; ++i) {
         ouput[i + startIndex] = input[i];
-        sum += input[i];
+        sum += (int32_t)input[i];
     }
 
     return sum;
@@ -125,7 +125,9 @@ static void WriteHeader(struct TagHeader *header, const char *fileName, long fil
 static void WriteZipContent(gzFile gzFd, const char *fileName, long fileSize)
 {
     char buf[HEADER_NUM];
-    int32_t ret;
+    ssize_t ret;
+    int32_t iret;
+    long temFileSize = fileSize;
     bool cond = (gzFd == NULL || fileName == NULL || fileSize == 0);
 
     if (cond) {
@@ -137,7 +139,7 @@ static void WriteZipContent(gzFile gzFd, const char *fileName, long fileSize)
     if (fileFd < 0) {
         return;
     }
-    while (fileSize > 0) {
+    while (temFileSize > 0) {
         (void)memset_s(buf, HEADER_NUM, 0, HEADER_NUM);
         ret = read(fileFd, buf, HEADER_NUM);
         if (ret < 0) {
@@ -145,23 +147,23 @@ static void WriteZipContent(gzFile gzFd, const char *fileName, long fileSize)
             goto CLOSE_FD;
         }
 
-        ret = gzwrite(gzFd, buf, HEADER_NUM);
-        if (ret < 0) {
+        iret = gzwrite(gzFd, buf, HEADER_NUM);
+        if (iret < 0) {
             tloge("gzwrite failed\n");
             goto CLOSE_FD;
-        } else if (ret < HEADER_NUM) {
+        } else if (iret < HEADER_NUM) {
             tloge("incomplete gzwrite\n");
             goto CLOSE_FD;
         }
 
-        fileSize -= HEADER_NUM;
+        temFileSize -= HEADER_NUM;
     }
 
 CLOSE_FD:
     close(fileFd);
 }
 
-static int32_t OpenZipFile(const char *outputName, gzFile *outFile)
+static int32_t OpenZipFile(const char *outputName, gzFile *outFile, gid_t pathGroup)
 {
     int32_t ret;
 
@@ -178,7 +180,7 @@ static int32_t OpenZipFile(const char *outputName, gzFile *outFile)
         close(fd);
         return -1;
     }
-    ret = fchown(fd, (uid_t)-1, AID_SYSTEM);
+    ret = fchown(fd, (uid_t)-1, pathGroup);
     if (ret < 0) {
         tloge("chown failed\n");
         gzclose(out);
@@ -241,7 +243,7 @@ static int32_t WriteSingleFile(const char *fileName, gzFile out)
 }
 
 /* tar and zip input files to output file */
-void TarZipFiles(uint32_t nameCount, const char **inputNames, const char *outputName)
+void TarZipFiles(uint32_t nameCount, const char **inputNames, const char *outputName, gid_t pathGroup)
 {
     gzFile out = NULL;
     int32_t ret;
@@ -254,7 +256,7 @@ void TarZipFiles(uint32_t nameCount, const char **inputNames, const char *output
         return;
     }
 
-    ret = OpenZipFile(outputName, &out);
+    ret = OpenZipFile(outputName, &out, pathGroup);
     if (ret != 0) {
         return;
     }

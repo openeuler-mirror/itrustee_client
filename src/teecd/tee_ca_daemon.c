@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2012-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2012-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -24,12 +24,16 @@
 #include "securec.h"
 #include "tc_ns_client.h"
 #include "tee_client_type.h"
+#include "tee_agent.h"
 #include "tee_log.h"
 #include "tee_auth_common.h"
 #include "tee_ca_auth.h"
 #include "system_ca_auth.h"
 
 /* debug switch */
+#ifdef LOG_NDEBUG
+#undef LOG_NDEBUG
+#endif
 #ifdef LOG_TAG
 #undef LOG_TAG
 #endif
@@ -114,7 +118,7 @@ static int ProcessCaMsg(const struct ucred *cr, const CaRevMsg *caInfo, int sock
 
     if (caInfo->cmd == GET_TEEVERSION) {
         ret = SendFileDescriptor(caInfo->cmd, socket, (int)g_version);
-        if (ret) {
+        if (ret != 0) {
             tloge("Failed to send version back. ret = %d\n", ret);
             return -1;
         }
@@ -144,52 +148,6 @@ static int ProcessCaMsg(const struct ucred *cr, const CaRevMsg *caInfo, int sock
     return 0;
 }
 
-
-static int SyncSysTimeToSecure(void)
-{
-    TC_NS_Time tcNsTime;
-    struct timeval timeVal;
-
-    int ret = gettimeofday(&timeVal, NULL);
-    if (ret != 0) {
-        tloge("get system time failed ret=0x%x\n", ret);
-        return ret;
-    }
-    if (timeVal.tv_sec < 0xFFFFF) {
-        return -1;
-    }
-    tcNsTime.seconds = timeVal.tv_sec;
-    tcNsTime.millis  = timeVal.tv_usec / 1000;
-
-    int fd = open(TC_NS_CLIENT_DEV_NAME, O_RDWR);
-    if (fd < 0) {
-        tloge("Failed to open %s: %d\n", TC_NS_CLIENT_DEV_NAME, errno);
-        return fd;
-    }
-    ret = ioctl(fd, (int)TC_NS_CLIENT_IOCTL_SYC_SYS_TIME, &tcNsTime);
-    if (ret != 0) {
-        tloge("failed to send sys time to teeos\n");
-    }
-
-    close(fd);
-    return ret;
-}
-
-static void TrySyncSysTimeToSecure(void)
-{
-    int ret;
-    static int syncSysTimed = 0;
-
-    if (syncSysTimed == 0) {
-        ret = SyncSysTimeToSecure();
-        if (ret) {
-            tloge("failed to sync sys time to secure\n");
-        } else {
-            syncSysTimed = 1;
-        }
-    }
-}
-
 static void ProcessAccept(int s, int daemonType, CaRevMsg *caInfo)
 {
     struct ucred cr;
@@ -215,15 +173,15 @@ static void ProcessAccept(int s, int daemonType, CaRevMsg *caInfo)
         tlogd("uid %d pid %d\n", cr.uid, cr.pid);
 
         ret = RecvCaMsg(s2, caInfo);
-        if (ret) {
-            tloge("tee ca daemon recvmsg failed. \n");
+        if (ret != 0) {
+            tloge("tee ca daemon recvmsg failed\n");
             goto CLOSE_SOCKET;
         }
 
         TrySyncSysTimeToSecure();
 
         ret = ProcessCaMsg(&cr, caInfo, s2);
-        if (ret) {
+        if (ret != 0) {
             tloge("Failed to process ca msg. ret=%d, daemon_type=%d\n", ret, daemonType);
             goto CLOSE_SOCKET;
         }
@@ -249,7 +207,7 @@ static int FormatSockAddr(int32_t connectType, struct sockaddr_un *local, sockle
                         sizeof(TC_NS_SOCKET_NAME_SYSTEM));
     }
 
-    if (ret) {
+    if (ret != EOK) {
         tloge("strncpy_s failed! connect type is %d\n", connectType);
         return ret;
     }
@@ -262,7 +220,7 @@ static int FormatSockAddr(int32_t connectType, struct sockaddr_un *local, sockle
     return 0;
 }
 
-int GetTEEVersion()
+int GetTEEVersion(void)
 {
     int ret;
     int fd = open(TC_NS_CLIENT_DEV_NAME, O_RDWR);

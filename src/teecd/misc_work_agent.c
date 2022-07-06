@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -80,7 +80,7 @@ void *MiscWorkThread(void *control)
     while (1) {
         tlogv("++ misc agent loop ++\n");
         ret = ioctl(miscFd, (int)TC_NS_CLIENT_IOCTL_WAIT_EVENT, AGENT_MISC_ID);
-        if (ret) {
+        if (ret != 0) {
             tloge("misc agent wait event failed\n");
             break;
         }
@@ -108,7 +108,7 @@ void *MiscWorkThread(void *control)
         __asm__ volatile("dsb sy");
 
         ret = ioctl(miscFd, (int)TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, AGENT_MISC_ID);
-        if (ret) {
+        if (ret != 0) {
             tloge("misc agent send reponse failed\n");
             break;
         }

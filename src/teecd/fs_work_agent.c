@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -20,6 +20,7 @@
 #include <sys/statfs.h>
 #include <sys/resource.h>
 #include <securec.h>
+#include <libgen.h>
 #include <mntent.h>
 
 #include "tc_ns_client.h"
@@ -327,7 +328,7 @@ static int32_t GetPersistentDir(char* path, size_t pathLen)
     return GetPathStorage(path, pathLen, "SFS_PARTITION_PERSISTENT");
 }
 
-#define USER_PATH_SIZE 10
+#define USER_PATH_SIZE 12
 static int32_t JoinFileNameTransient(const char *name, char *path, size_t pathLen)
 {
     errno_t rc;
@@ -335,8 +336,9 @@ static int32_t JoinFileNameTransient(const char *name, char *path, size_t pathLe
     uint32_t userId = GetCurrentUserId();
 
     ret = GetTransientDir(path, pathLen);
-    if (ret != 0)
+    if (ret != 0) {
         return ret;
+    }
 
     if (userId != 0) {
         char userPath[USER_PATH_SIZE] = { 0 };
@@ -385,8 +387,9 @@ static int32_t GetDefaultDir(char *path, size_t pathLen)
     int32_t ret;
 
     ret = GetPersistentDir(path, pathLen);
-    if (ret != 0)
+    if (ret != 0) {
         return ret;
+    }
 
     rc = strncat_s(path, pathLen, SFS_PARTITION_PERSISTENT, strlen(SFS_PARTITION_PERSISTENT));
     if (rc != EOK) {
@@ -664,14 +667,13 @@ static int32_t IsFileExist(const char *name)
     struct stat statbuf;
 
     if (name == NULL) {
+        tloge("Invalid file name\n");
         return 0;
     }
     if (stat(name, &statbuf) != 0) {
         if (errno == ENOENT) { /* file not exist */
-            tloge("file stat failed\n");
             return 0;
         }
-        return 1;
     }
 
     return 1;
@@ -744,7 +746,6 @@ static void OpenWork(struct SecStorageType *transControl)
     } else {
         if (IsFileExist(nameBuff) == 0) {
             /* open a nonexist file, return fail */
-            tloge("file is not exist, open failed\n");
             error = ENOENT;
             goto ERROR;
         }
@@ -808,7 +809,7 @@ static void ReadWork(struct SecStorageType *transControl)
         transControl->ret = (int32_t)count;
 
         if (count < transControl->args.read.count) {
-            if (feof(selFile->file)) {
+            if (feof(selFile->file) != 0) {
                 transControl->ret2 = 0;
                 tlogv("read end of file\n");
             } else {
@@ -872,7 +873,7 @@ static void SeekWork(struct SecStorageType *transControl)
 
     if (FindOpenFile(transControl->args.seek.fd, &selFile) != 0) {
         ret = fseek(selFile->file, transControl->args.seek.offset, (int32_t)transControl->args.seek.whence);
-        if (ret) {
+        if (ret != 0) {
             tloge("seek file failed: %d\n", errno);
             transControl->error = (uint32_t)errno;
         } else {
@@ -1183,13 +1184,14 @@ static void DiskUsageWork(struct SecStorageType *transControl)
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
 
     tlogv("sec storage : disk usage\n");
-    if (GetTransientDir(nameBuff, FILE_NAME_MAX_BUF) != 0)
+    if (GetTransientDir(nameBuff, FILE_NAME_MAX_BUF) != 0) {
         goto ERROR;
+    }
     if (statfs((const char*)nameBuff, &st) < 0) {
         tloge("statfs /secStorageData failed, err=%d\n", errno);
         goto ERROR;
     }
-    dataRemain = (long)st.f_bfree * (long)st.f_bsize / KBYTE;
+    dataRemain = (uint32_t)st.f_bfree * (uint32_t)st.f_bsize / KBYTE;
 
     if (GetPersistentDir(nameBuff, FILE_NAME_MAX_BUF) != 0) {
         tloge("get persistent dir error.\n");
@@ -1203,7 +1205,7 @@ static void DiskUsageWork(struct SecStorageType *transControl)
         tloge("statfs /secStorage failed, err=%d\n", errno);
         goto ERROR;
     }
-    secStorageRemain = (long)st.f_bfree * (long)st.f_bsize / KBYTE;
+    secStorageRemain = (uint32_t)st.f_bfree * (uint32_t)st.f_bsize / KBYTE;
 
     transControl->ret                       = 0;
     transControl->args.diskUsage.data       = dataRemain;

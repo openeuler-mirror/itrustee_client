@@ -1,4 +1,4 @@
-# itrustee client
+# client
 
 #### Description
 There are 3 modules in the directory: libteec.so、teecd、tlogcat.

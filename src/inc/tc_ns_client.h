@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2012-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2012-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -13,6 +13,7 @@
 #ifndef _TC_NS_CLIENT_H_
 #define _TC_NS_CLIENT_H_
 #include "tee_client_type.h"
+#include "cap_bit.h"
 #define TC_DEBUG
 
 #define INVALID_TYPE         0x00
@@ -22,12 +23,7 @@
 #define ZERO_OR_NULL_PTR(x) ((unsigned long)(x) <= (unsigned long)ZERO_SIZE_PTR)
 #endif
 
-#ifdef SECURITY_AUTH_ENHANCE
-#define TOKEN_SAVE_LEN 24                /* 24byte */
-#endif
-
 #define UUID_SIZE      16
-
 #define TC_NS_CLIENT_IOC_MAGIC 't'
 #define TC_NS_CLIENT_DEV       "tc_ns_client"
 #define TC_NS_CLIENT_DEV_NAME  "/dev/tc_ns_client"
@@ -39,18 +35,28 @@ typedef struct {
 
 typedef union {
     struct {
-        unsigned int buffer;
-        unsigned int buffer_h_addr;
-        unsigned int offset;
-        unsigned int h_offset;
-        unsigned int size_addr;
-        unsigned int size_h_addr;
+        CAP_BITF(
+        unsigned int buffer,
+        unsigned int buffer_h_addr
+        )
+        CAP_BITF(
+        unsigned int offset,
+        unsigned int h_offset
+        )
+        CAP_BITF(
+        unsigned int size_addr,
+        unsigned int size_h_addr
+        )
     } memref;
     struct {
-        unsigned int a_addr;
-        unsigned int a_h_addr;
-        unsigned int b_addr;
-        unsigned int b_h_addr;
+        CAP_BITF(
+        unsigned int a_addr,
+        unsigned int a_h_addr
+        )
+        CAP_BITF(
+        unsigned int b_addr,
+        unsigned int b_h_addr
+        )
     } value;
 } TC_NS_ClientParam;
 
@@ -68,16 +74,6 @@ typedef struct {
     TC_NS_ClientParam params[TEEC_PARAM_NUM];
     unsigned int paramTypes;
     bool started;
-#ifdef SECURITY_AUTH_ENHANCE
-    union {
-        struct {
-            unsigned int teec_token_addr;
-            unsigned int teec_token_h_addr;
-        } token_addr;
-        void *teec_token;
-    } token;
-    unsigned int token_len;
-#endif
     unsigned int callingPid;
     unsigned int file_size;
     union {
@@ -96,6 +92,8 @@ enum SecFileType {
     LOAD_SERVICE,
     LOAD_LIB,
     LOAD_DYNAMIC_DRV,
+    LOAD_PATCH,
+    LOAD_TYPE_MAX
 };
 
 struct SecLoadIoctlStruct {

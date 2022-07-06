@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2013-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2013-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -35,7 +35,6 @@
 #define LOG_TAG "teec_app_load"
 
 #define MAX_PATH_LEN 256
-const char *g_imagePath = "/vendor/bin";
 
 static int32_t TEEC_ReadApp(const TaFileInfo *taFile, const char *loadFile, bool defaultPath,
                             TC_NS_ClientContext *cliContext);
@@ -60,7 +59,7 @@ int32_t TEEC_GetApp(const TaFileInfo *taFile, const TEEC_UUID *srvUuid, TC_NS_Cl
             tloge("teec load app erro, ta path is not NULL\n");
         }
     } else {
-        const char *filePath = g_imagePath;
+        const char *filePath = "/vendor/bin";
         ret = snprintf_s(fileName, sizeof(fileName), sizeof(fileName) - 1,
                          "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x", srvUuid->timeLow, srvUuid->timeMid,
                          srvUuid->timeHiAndVersion, srvUuid->clockSeqAndNode[0], srvUuid->clockSeqAndNode[1],
@@ -190,7 +189,7 @@ static int32_t TEEC_DoReadApp(FILE *fp, TC_NS_ClientContext *cliContext)
 
     /* get magic-num & version-num */
     int32_t ret = TEEC_GetImageLenth(fp, &totalImgLen);
-    if (ret) {
+    if (ret != 0) {
         tloge("get image lenth fail\n");
         return -1;
     }

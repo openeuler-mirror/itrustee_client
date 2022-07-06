@@ -1,6 +1,6 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
- * iTrustee licensed under the Mulan PSL v2.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
@@ -15,18 +15,18 @@
 
 #include <syslog.h>
 
-#define TEE_LOG_MASK        TZ_LOG_ERROR
+#define TEE_LOG_MASK        TZ_LOG_INFO
 
 #define TZ_LOG_VERBOSE 0
-#define TZ_LOG_INFO    1
-#define TZ_LOG_WARN    2
-#define TZ_LOG_DEBUG   3
+#define TZ_LOG_DEBUG   1
+#define TZ_LOG_INFO    2
+#define TZ_LOG_WARN    3
 #define TZ_LOG_ERROR   4
 
 #define tlogv(...) \
     do { \
         if (TZ_LOG_VERBOSE == TEE_LOG_MASK) \
-            syslog(LOG_USER | LOG_NOTICE, __VA_ARGS__); \
+            syslog(LOG_USER | LOG_DEBUG, __VA_ARGS__); \
     } while (0)
 
 #define tlogd(...) \

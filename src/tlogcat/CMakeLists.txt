@@ -17,7 +17,7 @@ include_directories(
 
 # Set compile options
 set(CMAKE_TLOGCAT_FLAGS "-Werror -Wextra -DTLOGCAT_SYS_LOG")
-set(CMAKE_TLOGCAT_FLAGS "${CMAKE_TLOGCAT_FLAGS} -DTEE_KTRACE_DUMP -DLOG_PATH_TEE=\\\"/var/log/tee/\\\" -DLOG_PATH_BASE=\\\"/var/log/\\\"")
+set(CMAKE_TLOGCAT_FLAGS "${CMAKE_TLOGCAT_FLAGS} -DTEE_KTRACE_DUMP -DLOG_PATH_TEE=\\\"/var/log/tee/\\\" -DTEE_LOG_PATH_BASE=\\\"/var/log/\\\"")
 set(CMAKE_TLOGCAT_FLAGS "${CMAKE_TLOGCAT_FLAGS} -DLOG_TMPPATH_TEE=\\\"/var/log/tee/_tmp/\\\" -DAID_SYSTEM=0")
 set(CMAKE_TLOGCAT_FLAGS "${CMAKE_TLOGCAT_FLAGS} -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2")
 
