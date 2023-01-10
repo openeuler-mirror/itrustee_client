@@ -37,7 +37,14 @@ int GetLoginInfoHidl(const struct ucred *cr, const CaRevMsg *caRevInfo, int fd, 
         return -1;
     }
 
+    ret = TeeCheckHidlAuth(cr->uid, cr->pid);
+    if (ret != 0) {
+        tloge("check hidl auth failed, ret %d\n", ret);
+        return -1;
+    }
+
     const CaAuthInfo *caInfo = &(caRevInfo->caAuthInfo);
+
     if (caInfo->type == SYSTEM_CA) {
         tlogd(" non apk ca from system\n");
         ret = TeeGetNativeCert(caInfo->pid, caInfo->uid, &bufLen, buf);
@@ -54,7 +61,7 @@ int GetLoginInfoHidl(const struct ucred *cr, const CaRevMsg *caRevInfo, int fd, 
         tlogd(" apk ca from system\n");
         rc = memcpy_s(buf, bufLen, caInfo->certs, sizeof(caInfo->certs));
         if (rc != EOK) {
-            tloge("memcpy_s erro!\n");
+            tloge("memcpy_s error!\n");
             return -1;
         }
     } else {

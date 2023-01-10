@@ -9,7 +9,6 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
-
 #ifndef SYSTEM_CA_AUTH_H
 #define SYSTEM_CA_AUTH_H
 

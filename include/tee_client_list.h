@@ -19,7 +19,7 @@ struct ListNode {
 };
 
 #define OFFSET_OF(type, member) (unsigned long)(&(((type *)0)->member))
-#define CONTAINER_OF(pos, type, member) (type *)(((char *)(pos)) - OFFSET_OF(type, member))
+#define CONTAINER_OF(pos, type, member) (type *)(uintptr_t)(((char *)(pos)) - OFFSET_OF(type, member))
 
 #define LIST_DECLARE(name) \
     struct ListNode name = { \
@@ -80,7 +80,7 @@ static inline struct ListNode *ListRemoveTail(struct ListNode *list)
 }
 
 #define LIST_ENTRY(ptr, type, member) \
-    ((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->(member))))
+    ((type *)(((char *)(ptr)) - (unsigned long)(&(((type *)0)->member))))
 
 #define LIST_FOR_EACH(pos, list) \
     for ((pos) = (list)->next; (pos) != (list); (pos) = (pos)->next)
@@ -88,17 +88,13 @@ static inline struct ListNode *ListRemoveTail(struct ListNode *list)
 #define LIST_FOR_EACH_SAFE(pos, n, list) \
     for ((pos) = (list)->next, (n) = (pos)->next; (pos) != (list); (pos) = (n), (n) = (pos)->next)
 
-#define LIST_FOR_EACH_ENTRY(pos, list, member)                                                       \
-    do {                                                                                             \
-        for ((pos) = LIST_ENTRY((list)->next, typeof(*(pos)), (member)); &(pos)->(member) != (list); \
-            (pos) = LIST_ENTRY((pos)->(member).next, typeof(*(pos)), (member)))                      \
-    } while (0)
+#define LIST_FOR_EACH_ENTRY(pos, list, member)                                                  \
+    for ((pos) = LIST_ENTRY((list)->next, typeof(*(pos)), member); &(pos)->member != (list);    \
+        (pos) = LIST_ENTRY((pos)->member.next, typeof(*(pos)), member))
 
-#define LIST_FOR_EACH_ENTRY_SAFE(pos, n, list, member)                                                             \
-    do {                                                                                                           \
-        for ((pos) = LIST_ENTRY((list)->next, typeof(*(pos)), (member)),                                           \
-            (n) = LIST_ENTRY((pos)->(member).next, typeof(*(pos)), (member));                                      \
-            &(pos)->(member) != (list); (pos) = (n), (n) = LIST_ENTRY((n)->(member).next, typeof(*(n)), (member))) \
-    } while (0)
+#define LIST_FOR_EACH_ENTRY_SAFE(pos, n, list, member)                                                   \
+    for ((pos) = LIST_ENTRY((list)->next, typeof(*(pos)), member),                                       \
+        (n) = LIST_ENTRY((pos)->member.next, typeof(*(pos)), member);                                    \
+        &(pos)->member != (list); (pos) = (n), (n) = LIST_ENTRY((n)->member.next, typeof(*(n)), member))
 
 #endif

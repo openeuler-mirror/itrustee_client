@@ -14,9 +14,21 @@
 #define PROC_TAG_H
 
 #include <stdbool.h>
+
 #include "tlogcat.h"
 
+#ifdef CONFIG_TLOGCAT_TAG
 void JudgeLogTag(const struct LogItem *logItem, bool isTa, const char **logTag);
 void FreeTagNode(void);
-
+#else
+static inline void JudgeLogTag(const struct LogItem *logItem, bool isTa, const char **logTag)
+{
+	(void)logItem;
+	(void)isTa;
+	(void)logTag;
+}
+static inline void FreeTagNode(void)
+{
+}
+#endif
 #endif

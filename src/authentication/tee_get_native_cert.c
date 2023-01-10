@@ -42,8 +42,8 @@ static int SetPathToBuf(uint8_t *buffer, uint32_t *len, uint32_t *inputLen, cons
     }
 
     buffer    += sizeof(pathLen);
-    *len      += sizeof(pathLen);
-    *inputLen -= sizeof(pathLen);
+    *len      += (uint32_t)sizeof(pathLen);
+    *inputLen -= (uint32_t)sizeof(pathLen);
     ret = -1;
 
     if (num > *inputLen) {

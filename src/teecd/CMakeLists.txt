@@ -7,7 +7,7 @@ set(LIB_SRCS
     ../libteec_vendor/tee_client_ext_api.c
     ../libteec_vendor/tee_client_app_load.c
     ../libteec_vendor/tee_client_socket.c
-    ../teecd/secfile_load_agent.c
+    ../libteec_vendor/tee_load_sec_file.c
     ../libteec_vendor/tee_session_pool.c
 )
 set(APP_SRCS
@@ -17,9 +17,11 @@ set(APP_SRCS
     ./fs_work_agent.c
     ./misc_work_agent.c
     ./tee_ca_auth.c
+    ./tee_load_dynamic.c
     ./system_ca_auth.c
     ../authentication/tee_get_native_cert.c
     ../authentication/tee_auth_common.c
+    ../libteec_vendor/tee_load_sec_file.c
 )
 
 # Add header file include directories
@@ -35,12 +37,11 @@ include_directories(
 )
 
 # Set compile options
-set(CMAKE_TEEC_FLAGS "-DSEC_STROAGE_DATA_KUNPENG_PATH -DSECURITY_AUTH_ENHANCE")
 set(CMAKE_TEEC_FLAGS "${CMAKE_TEEC_FLAGS} -shared")
 set(CMAKE_TEEC_FLAGS "${CMAKE_TEEC_FLAGS} -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIC -D_FORTIFY_SOURCE=2 -O2")
 
 # Set options for teecd
-set(CMAKE_TEECD_FLAGS "-DSEC_STROAGE_DATA_KUNPENG_PATH -D_GNU_SOURCE -DSECURITY_AUTH_ENHANCE -DCONFIG_AGENT_FS")
+set(CMAKE_TEECD_FLAGS "-D_GNU_SOURCE -DCONFIG_AGENT_FS")
 set(CMAKE_TEECD_FLAGS "${CMAKE_TEECD_FLAGS} -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2")
 
 # Set libboundscheck lib path

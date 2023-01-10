@@ -16,9 +16,7 @@
 #include <string.h>
 #include <errno.h>     /* for errno */
 #include <sys/types.h> /* for open close */
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/ioctl.h> /* for ioctl */
 #include <sys/mman.h>  /* for mmap */
 #include <linux/limits.h>
 #include "tee_log.h"
@@ -26,7 +24,7 @@
 #include "tc_ns_client.h"
 #include "securec.h"
 #include "tee_client_inner.h"
-#include "secfile_load_agent.h"
+#include "tee_load_sec_file.h"
 
 /* debug switch */
 #ifdef LOG_TAG
@@ -34,6 +32,7 @@
 #endif
 #define LOG_TAG "teec_app_load"
 
+#define H_OFFSET 32
 #define MAX_PATH_LEN 256
 
 static int32_t TEEC_ReadApp(const TaFileInfo *taFile, const char *loadFile, bool defaultPath,
@@ -56,10 +55,10 @@ int32_t TEEC_GetApp(const TaFileInfo *taFile, const TEEC_UUID *srvUuid, TC_NS_Cl
     if (condition) {
         ret = TEEC_ReadApp(taFile, (const char *)taFile->taPath, false, cliContext);
         if (ret < 0) {
-            tloge("teec load app erro, ta path is not NULL\n");
+            tloge("teec load app error, ta path is not NULL\n");
         }
     } else {
-        const char *filePath = "/vendor/bin";
+        const char *filePath = DYNAMIC_TA_PATH;
         ret = snprintf_s(fileName, sizeof(fileName), sizeof(fileName) - 1,
                          "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x", srvUuid->timeLow, srvUuid->timeMid,
                          srvUuid->timeHiAndVersion, srvUuid->clockSeqAndNode[0], srvUuid->clockSeqAndNode[1],
@@ -81,7 +80,7 @@ int32_t TEEC_GetApp(const TaFileInfo *taFile, const TEEC_UUID *srvUuid, TC_NS_Cl
 
         ret = TEEC_ReadApp(taFile, (const char *)tempName, true, cliContext);
         if (ret < 0) {
-            tloge("teec load app erro\n");
+            tloge("teec load app error\n");
         }
     }
 
@@ -110,12 +109,12 @@ static int32_t GetTaVersion(FILE *fp, uint32_t *taHeadLen, uint32_t *version,
                      (imgIdentity.img_identity.magic_num2 == TA_HEAD_MAGIC2) &&
                      (imgIdentity.img_identity.version_num > 1);
     if (condition) {
-        tlogd("new verison ta\n");
+        tlogd("new version ta\n");
         *taHeadLen = sizeof(TeecTaHead);
         *version   = imgIdentity.img_identity.version_num;
         if (*version >= CIPHER_LAYER_VERSION) {
             *contextLen  = imgIdentity.context_len;
-            *totalImgLen = *contextLen + sizeof(imgIdentity);
+            *totalImgLen = *contextLen + (uint32_t)sizeof(imgIdentity);
         } else {
             ret = fseek(fp, sizeof(imgIdentity.img_identity), SEEK_SET);
             if (ret != 0) {
@@ -125,7 +124,7 @@ static int32_t GetTaVersion(FILE *fp, uint32_t *taHeadLen, uint32_t *version,
         }
     } else {
         /* read the oldverison head again */
-        tlogd("old verison ta\n");
+        tlogd("old version ta\n");
         *taHeadLen = sizeof(TeecImageHead);
         ret       = fseek(fp, 0, SEEK_SET);
         if (ret != 0) {
@@ -209,8 +208,20 @@ static int32_t TEEC_DoReadApp(FILE *fp, TC_NS_ClientContext *cliContext)
         return -1;
     }
     cliContext->file_size   = totalImgLen;
-    cliContext->file_buffer = fileBuffer;
+    cliContext->memref.file_addr = (uint32_t)(uintptr_t)fileBuffer;
+    cliContext->memref.file_h_addr = (uint32_t)(((uint64_t)(uintptr_t)fileBuffer) >> H_OFFSET);
     return 0;
+}
+
+static bool TEEC_CheckRealPathSuffix(const char *realPath)
+{
+    const char* realPathSuffix = strrchr(realPath, '.');
+    if (realPathSuffix == NULL || strnlen(realPathSuffix, PATH_MAX) != strlen(".sec") ||
+        strncmp(realPathSuffix, ".sec", strlen(".sec")) != 0) {
+        tloge("realpath suffix -%s- format is wrong\n", realPathSuffix);
+        return false;
+    }
+    return true;
 }
 
 static int32_t TEEC_ReadApp(const TaFileInfo *taFile, const char *loadFile, bool defaultPath,
@@ -236,6 +247,10 @@ static int32_t TEEC_ReadApp(const TaFileInfo *taFile, const char *loadFile, bool
         /* maybe it's a built-in TA */
         tlogd("maybe it's a built-in TA or file is not in default path\n");
         return ret;
+    }
+
+    if (!TEEC_CheckRealPathSuffix(realLoadFile)) {
+        return -1;
     }
 
     /* open image file */
@@ -272,18 +287,18 @@ int32_t TEEC_LoadSecfile(const char *filePath, int tzFd, FILE *fp)
         return -1;
     }
     if (fp == NULL) {
-        if (realpath(filePath, realPath) != NULL) {
+        if (realpath(filePath, realPath) != NULL && TEEC_CheckRealPathSuffix(realPath)) {
             fpCur = fopen(realPath, "r");
         }
         if (fpCur == NULL) {
-            tloge("realpath open file erro%d, path=%s\n", errno, filePath);
+            tloge("realpath open file error%d, path=%s\n", errno, filePath);
             return -1;
         }
         fpUsable = fpCur;
     } else {
         fpUsable = fp;
     }
-    ret = LoadSecFile(tzFd, fpUsable, LOAD_LIB, NULL);
+    ret = LoadSecFile(tzFd, fpUsable, LOAD_LIB, NULL, NULL);
     if (fpCur != NULL) {
         fclose(fpCur);
     }

@@ -9,7 +9,6 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
-
 #ifndef LIBTEEC_TEE_AGENT_H
 #define LIBTEEC_TEE_AGENT_H
 

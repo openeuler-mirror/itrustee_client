@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2019-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -31,7 +31,7 @@ struct SecAgentControlType {
     SecAgentCmd cmd;
     uint32_t magic;
     int32_t ret;
-    uint32_t error;
+    int32_t error;
     union {
         struct {
             TEEC_UUID uuid;
@@ -48,7 +48,6 @@ struct SecAgentControlType {
 };
 
 void *SecfileLoadAgentThread(void *control);
-int32_t LoadSecFile(int tzFd, FILE *fp, enum SecFileType fileType, const TEEC_UUID *uuid);
 int GetSecLoadAgentFd(void);
 void SetSecLoadAgentFd(int secLoadAgentFd);
 

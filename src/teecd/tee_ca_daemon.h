@@ -13,11 +13,7 @@
 #ifndef LIBTEEC_TEE_CA_DAEMON_H
 #define LIBTEEC_TEE_CA_DAEMON_H
 #include <sys/stat.h>
-#include <sys/socket.h>
 #include "tee_auth_common.h"
-
-#define TC_NS_SOCKET_NAME        "#tc_ns_socket"
-#define TC_NS_SOCKET_NAME_SYSTEM "#tc_ns_socket_system"
 
 #define USER_DATA_DIR "/var/itrustee/sec_storage_data/"
 #define SFS_PARTITION_PERSISTENT "var/itrustee/sec_storage_data/"
@@ -62,12 +58,6 @@ enum MuMsgStatus {
 enum MuMsgUserid {
     MU_MSG_USERID_OWNER = 0x0,
     MU_MSG_USERID_MAX   = 0xFF,
-};
-
-enum ConnectCmd {
-    GET_FD,
-    GET_TEEVERSION,
-    SET_SYS_XML,
 };
 
 void *CaServerWorkThread(void *dummy);

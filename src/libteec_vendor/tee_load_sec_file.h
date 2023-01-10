@@ -9,14 +9,17 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
-#ifndef LIBTEEC_EXT_API_H
-#define LIBTEEC_EXT_API_H
 
-#include <stdint.h>
-#include "tee_auth_common.h"
+#ifndef __TEE_LOAD_SEC_FILE_H_
+#define __TEE_LOAD_SEC_FILE_H_
 
-#define TC_NS_SOCKET_NAME        "#tc_ns_socket"
+#include <sys/ioctl.h> /* for ioctl */
+#include "tee_client_api.h"
+#include "tc_ns_client.h"
 
-int CaDaemonConnectWithCaInfo(const CaAuthInfo *caInfo, int cmd, const TEEC_XmlParameter *halXmlPtr);
+#define H_OFFSET 32
+#define MAX_BUFFER_LEN (8 * 1024 * 1024)
+
+int32_t LoadSecFile(int tzFd, FILE *fp, enum SecFileType fileType, const TEEC_UUID *uuid, int32_t *errCode);
 
 #endif

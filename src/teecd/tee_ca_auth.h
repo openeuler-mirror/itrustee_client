@@ -9,7 +9,6 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
-
 #ifndef TEE_AUTH_CA_H
 #define TEE_AUTH_CA_H
 

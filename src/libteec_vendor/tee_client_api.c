@@ -17,18 +17,14 @@
 #include <stdio.h>
 #include <errno.h>     /* for errno */
 #include <sys/types.h> /* for open close */
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <sys/ioctl.h> /* for ioctl */
 #include <sys/mman.h>  /* for mmap */
 #include <pthread.h>
 #include <securec.h>
-#include <linux/limits.h>
 #include "tee_client_list.h"
 #include "tee_log.h"
 #include "tc_ns_client.h"
 #include "tee_client_app_load.h"
-#include "tee_ca_daemon.h"
 #include "tee_client_inner.h"
 #include "tee_client_socket.h"
 
@@ -56,7 +52,7 @@
  * this process may endanger the whole system, so it has to be stoped immediately,
  * before it could do anything harmful, in this circumstances, exit() should be called.
  */
-__attribute__((constructor)) void LibteecVendorInit(void)
+__attribute__((constructor)) static void LibteecVendorInit(void)
 {
     tlogd("checking LD_PRELOAD\n");
     char *preload = getenv("LD_PRELOAD");
@@ -76,7 +72,7 @@ void SetBit(uint32_t i, uint32_t byteMax, uint8_t *bitMap)
     if (bitMap == NULL) {
         return;
     }
-    bitMap[i >> SHIFT] |= (1U << (i & MASK));
+    bitMap[i >> SHIFT] |= (uint8_t)(1U << (i & MASK));
 }
 
 void ClearBit(uint32_t i, uint32_t byteMax, uint8_t *bitMap)
@@ -87,7 +83,7 @@ void ClearBit(uint32_t i, uint32_t byteMax, uint8_t *bitMap)
     if (bitMap == NULL) {
         return;
     }
-    bitMap[i >> SHIFT] &= ~(1U << (i & MASK));
+    bitMap[i >> SHIFT] &= (uint8_t)(~(1U << (i & MASK)));
 }
 
 static void ClearBitWithLock(pthread_mutex_t *mutex, uint32_t i, uint32_t byteMax, uint8_t *bitMap)
@@ -550,9 +546,9 @@ static uint32_t TranslateParamType(uint32_t flag)
 static void TEEC_EncodeTempParam(const TEEC_TempMemoryReference *tempRef, TC_NS_ClientParam *param)
 {
     param->memref.buffer        = (unsigned int)(uintptr_t)tempRef->buffer;
-    param->memref.buffer_h_addr = ((unsigned long long)(uintptr_t)tempRef->buffer) >> H_OFFSET;
+    param->memref.buffer_h_addr = (unsigned int)(((unsigned long long)(uintptr_t)tempRef->buffer) >> H_OFFSET);
     param->memref.size_addr     = (unsigned int)(uintptr_t)&tempRef->size;
-    param->memref.size_h_addr   = ((unsigned long long)(uintptr_t)&tempRef->size) >> H_OFFSET;
+    param->memref.size_h_addr   = (unsigned int)(((unsigned long long)(uintptr_t)&tempRef->size) >> H_OFFSET);
 }
 
 static void TEEC_EncodePartialParam(uint32_t paramType, const TEEC_RegisteredMemoryReference *memRef,
@@ -562,20 +558,23 @@ static void TEEC_EncodePartialParam(uint32_t paramType, const TEEC_RegisteredMem
     if (paramType == TEEC_MEMREF_WHOLE) {
         param->memref.offset      = 0;
         param->memref.size_addr   = (unsigned int)(uintptr_t)&memRef->parent->size;
-        param->memref.size_h_addr = ((unsigned long long)(uintptr_t)&memRef->parent->size) >> H_OFFSET;
+        param->memref.size_h_addr =
+            (unsigned int)(((unsigned long long)(uintptr_t)&memRef->parent->size) >> H_OFFSET);
     } else {
         param->memref.offset      = memRef->offset;
         param->memref.size_addr   = (unsigned int)(uintptr_t)&memRef->size;
-        param->memref.size_h_addr = ((unsigned long long)(uintptr_t)&memRef->size) >> H_OFFSET;
+        param->memref.size_h_addr = (unsigned int)(((unsigned long long)(uintptr_t)&memRef->size) >> H_OFFSET);
     }
 
     if (memRef->parent->is_allocated) {
         param->memref.buffer        = (unsigned int)(uintptr_t)memRef->parent->buffer;
-        param->memref.buffer_h_addr = ((unsigned long long)(uintptr_t)memRef->parent->buffer) >> H_OFFSET;
+        param->memref.buffer_h_addr =
+            (unsigned int)(((unsigned long long)(uintptr_t)memRef->parent->buffer) >> H_OFFSET);
     } else {
         param->memref.buffer = (unsigned int)(uintptr_t)((unsigned char *)memRef->parent->buffer + memRef->offset);
         param->memref.buffer_h_addr =
-            (unsigned long long)(uintptr_t)((unsigned char *)memRef->parent->buffer + memRef->offset) >> H_OFFSET;
+            (unsigned int)((unsigned long long)(uintptr_t)((unsigned char *)memRef->parent->buffer +
+            memRef->offset) >> H_OFFSET);
         param->memref.offset = 0;
     }
 }
@@ -583,17 +582,17 @@ static void TEEC_EncodePartialParam(uint32_t paramType, const TEEC_RegisteredMem
 static void TEEC_EncodeValueParam(const TEEC_Value *val, TC_NS_ClientParam *param)
 {
     param->value.a_addr   = (unsigned int)(uintptr_t)&val->a;
-    param->value.a_h_addr = ((unsigned long long)(uintptr_t)&val->a) >> H_OFFSET;
+    param->value.a_h_addr = (unsigned int)(((unsigned long long)(uintptr_t)&val->a) >> H_OFFSET);
     param->value.b_addr   = (unsigned int)(uintptr_t)&val->b;
-    param->value.b_h_addr = ((unsigned long long)(uintptr_t)&val->b) >> H_OFFSET;
+    param->value.b_h_addr = (unsigned int)(((unsigned long long)(uintptr_t)&val->b) >> H_OFFSET);
 }
 
 static void TEEC_EncodeIonParam(const TEEC_IonReference *ionRef, TC_NS_ClientParam *param)
 {
     param->value.a_addr   = (unsigned int)(uintptr_t)&ionRef->ion_share_fd;
-    param->value.a_h_addr = ((unsigned long long)(uintptr_t)&ionRef->ion_share_fd) >> H_OFFSET;
+    param->value.a_h_addr = (unsigned int)(((unsigned long long)(uintptr_t)&ionRef->ion_share_fd) >> H_OFFSET);
     param->value.b_addr   = (unsigned int)(uintptr_t)&ionRef->ion_size;
-    param->value.b_h_addr = ((unsigned long long)(uintptr_t)&ionRef->ion_size) >> H_OFFSET;
+    param->value.b_h_addr = (unsigned int)(((unsigned long long)(uintptr_t)&ionRef->ion_size) >> H_OFFSET);
 }
 
 static void TEEC_EncodeParam(TC_NS_ClientContext *cliContext, const TEEC_Operation *operation)
@@ -656,12 +655,12 @@ static TEEC_Result TEEC_Encode(TC_NS_ClientContext *cliContext, const TEEC_UUID 
     cliContext->login.method = cliLogin->method;
     cliContext->login.mdata  = cliLogin->mdata;
 
-    rc = memcpy_s(cliContext->uuid, sizeof(cliContext->uuid), (uint8_t *)serviceId, sizeof(TEEC_UUID));
+    rc = memcpy_s(cliContext->uuid, sizeof(cliContext->uuid), (const uint8_t *)serviceId, sizeof(TEEC_UUID));
     if (rc != EOK) {
         return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
     }
 
-    if ((operation == NULL) || (!operation->paramTypes)) {
+    if ((operation == NULL) || (operation->paramTypes == 0)) {
         return TEEC_SUCCESS;
     }
     cliContext->started = operation->cancel_flag;
@@ -704,7 +703,7 @@ TEEC_Result TEEC_InitializeContextWithType(const char *name, TEEC_ContextHidl *c
         return TEEC_ERROR_GENERIC;
     }
 
-    context->fd           = (uint32_t)fd;
+    context->fd           = fd;
     context->ops_cnt      = 1;
     context->callFromHidl = fromHidl;
 
@@ -883,7 +882,7 @@ static TEEC_Result TEEC_DoOpenSession(int fd, TC_NS_ClientContext *cliContext, c
     } else if (ret > 0) {
         tloge("open session failed(%d), code=0x%x, origin=%u\n", ret, cliContext->returns.code,
               cliContext->returns.origin);
-        if (cliContext->returns.code) {
+        if (cliContext->returns.code != 0) {
             teecRet = (TEEC_Result)cliContext->returns.code;
         } else {
             teecRet = (TEEC_Result)TEEC_ERROR_GENERIC;
@@ -907,7 +906,8 @@ TEEC_Result TEEC_OpenSessionHidl(int callingPid, const TaFileInfo *taFile, TEEC_
 
     /* prefirst, we set origin be zero */
     cliContext.returns.origin = TEEC_ORIGIN_API;
-    cliContext.file_buffer    = NULL;
+    cliContext.memref.file_addr = 0;
+    cliContext.memref.file_h_addr = 0;
 
     bool condition = (context == NULL) || (taFile == NULL) || (session == NULL) || (destination == NULL);
     if (condition) {
@@ -946,8 +946,7 @@ TEEC_Result TEEC_OpenSessionHidl(int callingPid, const TaFileInfo *taFile, TEEC_
 
     cliContext.callingPid = (unsigned int)callingPid;
 
-    int32_t ret = TEEC_GetApp(taFile, destination, &cliContext);
-    if (ret < 0) {
+    if (TEEC_GetApp(taFile, destination, &cliContext) < 0) {
         tloge("get app error\n");
         teecRet = (TEEC_Result)TEEC_ERROR_TRUSTED_APP_LOAD_ERROR;
         goto ERROR;
@@ -963,8 +962,9 @@ ERROR:
         *returnOrigin = cliContext.returns.origin;
     }
 
-    if (cliContext.file_buffer != NULL) {
-        free(cliContext.file_buffer);
+    if (cliContext.memref.file_addr != 0 || cliContext.memref.file_h_addr != 0) {
+        free((void *)(uintptr_t)(cliContext.memref.file_addr |
+                (((uint64_t)cliContext.memref.file_h_addr) << H_OFFSET)));
     }
     return teecRet;
 }
@@ -986,6 +986,8 @@ TEEC_Result TEEC_OpenSession(TEEC_Context *context, TEEC_Session *session, const
                              uint32_t connectionMethod, const void *connectionData, TEEC_Operation *operation,
                              uint32_t *returnOrigin)
 {
+    TaFileInfo taFile;
+    TEEC_ContextHidl *contextHidl = NULL;
     TEEC_Result ret    = TEEC_ERROR_BAD_PARAMETERS;
     uint32_t retOrigin = TEEC_ORIGIN_API;
 
@@ -1000,11 +1002,10 @@ TEEC_Result TEEC_OpenSession(TEEC_Context *context, TEEC_Session *session, const
      */
     session->context = context;
 
-    TaFileInfo taFile;
     taFile.taFp   = NULL;
     taFile.taPath = context->ta_path;
 
-    TEEC_ContextHidl *contextHidl = GetBnContext(context);
+    contextHidl = GetBnContext(context);
     if (contextHidl == NULL) {
         tloge("no context found in hidl service!\n");
         goto END;
@@ -1041,7 +1042,7 @@ void TEEC_CloseSessionHidl(TEEC_Session *session, const TEEC_ContextHidl *contex
         return;
     }
 
-    ret = ioctl((int)context->fd, (int)TC_NS_CLIENT_IOCTL_SES_CLOSE_REQ, &cliContext);
+    ret = ioctl(context->fd, TC_NS_CLIENT_IOCTL_SES_CLOSE_REQ, &cliContext);
     if (ret != 0) {
         tloge("close session failed, ret=0x%x\n", ret);
     }
@@ -1088,7 +1089,7 @@ static TEEC_Result ProcessInvokeCommand(const TEEC_ContextHidl *context, TC_NS_C
 {
     TEEC_Result teecRet;
 
-    int32_t ret = ioctl((int)context->fd, (int)TC_NS_CLIENT_IOCTL_SEND_CMD_REQ, cliContext);
+    int32_t ret = ioctl(context->fd, TC_NS_CLIENT_IOCTL_SEND_CMD_REQ, cliContext);
     if (ret == 0) {
         tlogd("invoke cmd success\n");
         teecRet = TEEC_SUCCESS;
@@ -1099,7 +1100,7 @@ static TEEC_Result ProcessInvokeCommand(const TEEC_ContextHidl *context, TC_NS_C
     } else {
         tloge("invoke cmd failed(%d), code=0x%x, origin=%u\n", ret,
               cliContext->returns.code, cliContext->returns.origin);
-        if (cliContext->returns.code) {
+        if (cliContext->returns.code != 0) {
             teecRet = (TEEC_Result)cliContext->returns.code;
         } else {
             teecRet = (TEEC_Result)TEEC_ERROR_GENERIC;
@@ -1162,6 +1163,8 @@ ERROR:
 TEEC_Result TEEC_InvokeCommand(TEEC_Session *session, uint32_t commandID, TEEC_Operation *operation,
                                uint32_t *returnOrigin)
 {
+    TEEC_Context *contextTemp = NULL;
+    TEEC_ContextHidl *contextHidl = NULL;
     TEEC_Result ret    = TEEC_ERROR_BAD_PARAMETERS;
     uint32_t retOrigin = TEEC_ORIGIN_API;
 
@@ -1169,8 +1172,8 @@ TEEC_Result TEEC_InvokeCommand(TEEC_Session *session, uint32_t commandID, TEEC_O
         tloge("invoke failed, session or session context is null\n");
         goto END;
     }
-    TEEC_Context *contextTemp     = session->context;
-    TEEC_ContextHidl *contextHidl = GetBnContext(session->context);
+    contextTemp = session->context;
+    contextHidl = GetBnContext(session->context);
 
     ret = TEEC_InvokeCommandHidl(contextHidl, session, commandID, operation, &retOrigin);
     if (ret == TEEC_SUCCESS) {
@@ -1282,18 +1285,18 @@ static void RelaseBufferAndClearBit(TEEC_ContextHidl *context, TEEC_SharedMemory
     sharedMem->offset = 0;
 }
 
-static TEEC_Result CheckSharedMemoryParam(TEEC_ContextHidl *context, TEEC_SharedMemoryHidl *sharedMem)
+static TEEC_Result CheckSharedMemoryParam(const TEEC_ContextHidl *context, const TEEC_SharedMemoryHidl *sharedMem)
 {
     /* First, check parameters is valid or not */
     if ((context == NULL) || (sharedMem == NULL)) {
-        tloge("allocate sharedmem hidl: context or sharedMem is NULL\n");
+        tloge("allocate shardmem hidl: context or sharedMem is NULL\n");
         return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
     }
 
     bool condition = (sharedMem->flags != TEEC_MEM_INPUT) && (sharedMem->flags != TEEC_MEM_OUTPUT) &&
                      (sharedMem->flags != TEEC_MEM_INOUT) && (sharedMem->flags != TEEC_MEM_SHARED_INOUT);
     if (condition) {
-        tloge("allocate sharedmem hidl: sharedMem->flags wrong\n");
+        tloge("allocate shardmem hidl: sharedMem->flags wrong\n");
         return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
     }
 
@@ -1357,7 +1360,7 @@ TEEC_Result TEEC_AllocateSharedMemoryHidl(TEEC_ContextHidl *context, TEEC_Shared
         }
     } else if (sharedMem->size != 0) {
         sharedMem->buffer = mmap(0, (unsigned long)sharedMem->size, (PROT_READ | PROT_WRITE), MAP_SHARED,
-                                 (int)context->fd, (long)(sharedMem->offset * PAGE_SIZE));
+                                 context->fd, (long)(sharedMem->offset * (uint32_t)PAGE_SIZE));
     } else {
         sharedMem->buffer = ZERO_SIZE_PTR;
     }
@@ -1520,8 +1523,12 @@ void TEEC_ReleaseSharedMemory(TEEC_SharedMemory *sharedMem)
 
 static TEEC_Result TEEC_CheckTmpRef(TEEC_TempMemoryReference tmpref)
 {
-    if ((tmpref.buffer == NULL) || (tmpref.size == 0)) {
-        tloge("tmpref buffer is null, or size is zero\n");
+    if ((tmpref.buffer == NULL) && (tmpref.size != 0)) {
+        tloge("tmpref buffer is null, but size is not zero\n");
+        return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
+    }
+    if ((tmpref.buffer != NULL) && (tmpref.size == 0)) {
+        tloge("tmpref buffer is not null, but size is zero\n");
         return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
     }
     return (TEEC_Result)TEEC_SUCCESS;
@@ -1534,20 +1541,23 @@ static TEEC_Result TEEC_CheckMemRef(TEEC_RegisteredMemoryReference memref, uint3
         tloge("parent of memref is null, or the buffer is zero\n");
         return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
     }
-
+    if (memref.parent->size == 0) {
+        tloge("buffer size is zero\n");
+        return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
+    }
     if (paramType == TEEC_MEMREF_PARTIAL_INPUT) {
-        if (!(memref.parent->flags & TEEC_MEM_INPUT)) {
+        if ((memref.parent->flags & TEEC_MEM_INPUT) == 0) {
             goto PARAM_ERROR;
         }
     } else if (paramType == TEEC_MEMREF_PARTIAL_OUTPUT) {
-        if (!(memref.parent->flags & TEEC_MEM_OUTPUT)) {
+        if ((memref.parent->flags & TEEC_MEM_OUTPUT) == 0) {
             goto PARAM_ERROR;
         }
     } else if (paramType == TEEC_MEMREF_PARTIAL_INOUT) {
-        if (!(memref.parent->flags & TEEC_MEM_INPUT)) {
+        if ((memref.parent->flags & TEEC_MEM_INPUT) == 0) {
             goto PARAM_ERROR;
         }
-        if (!(memref.parent->flags & TEEC_MEM_OUTPUT)) {
+        if ((memref.parent->flags & TEEC_MEM_OUTPUT) == 0) {
             goto PARAM_ERROR;
         }
     } else {
@@ -1664,7 +1674,7 @@ void TEEC_RequestCancellation(TEEC_Operation *operation)
         return;
     }
 
-    ret = ioctl((int)session->context->fd, (int)TC_NS_CLIENT_IOCTL_CANCEL_CMD_REQ, &cliContext);
+    ret = ioctl(session->context->fd, TC_NS_CLIENT_IOCTL_CANCEL_CMD_REQ, &cliContext);
     if (ret == 0) {
         tlogd("invoke cmd success\n");
     } else if (ret < 0) {
@@ -1694,7 +1704,7 @@ TEEC_Result TEEC_EXT_RegisterAgent(uint32_t agentId, int *devFd, void **buffer)
 
     args.id         = agentId;
     args.bufferSize = AGENT_BUFF_SIZE;
-    ret             = ioctl(fd, (int)TC_NS_CLIENT_IOCTL_REGISTER_AGENT, &args);
+    ret             = ioctl(fd, TC_NS_CLIENT_IOCTL_REGISTER_AGENT, &args);
     if (ret != 0) {
         (void)close(fd);
         tloge("ioctl failed, failed to register agent!\n");
@@ -1710,7 +1720,7 @@ TEEC_Result TEEC_EXT_WaitEvent(uint32_t agentId, int devFd)
 {
     int ret;
 
-    ret = ioctl(devFd, (int)TC_NS_CLIENT_IOCTL_WAIT_EVENT, agentId);
+    ret = ioctl(devFd, TC_NS_CLIENT_IOCTL_WAIT_EVENT, agentId);
     if (ret != 0) {
         tloge("Agent 0x%x wait failed, errno=%d\n", agentId, ret);
         return TEEC_ERROR_GENERIC;
@@ -1722,7 +1732,7 @@ TEEC_Result TEEC_EXT_WaitEvent(uint32_t agentId, int devFd)
 TEEC_Result TEEC_EXT_SendEventResponse(uint32_t agentId, int devFd)
 {
     int ret;
-    ret = ioctl(devFd, (int)TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, agentId);
+    ret = ioctl(devFd, TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, agentId);
     if (ret != 0) {
         tloge("Agent %u failed to send response, ret is %d!\n", agentId, ret);
         return (TEEC_Result)TEEC_ERROR_GENERIC;
@@ -1744,7 +1754,7 @@ TEEC_Result TEEC_EXT_UnregisterAgent(uint32_t agentId, int devFd, void **buffer)
         tloge("fd is invalid!\n");
         return TEEC_ERROR_BAD_PARAMETERS;
     }
-    ret = ioctl(devFd, (int)TC_NS_CLIENT_IOCTL_UNREGISTER_AGENT, agentId);
+    ret = ioctl(devFd, TC_NS_CLIENT_IOCTL_UNREGISTER_AGENT, agentId);
     if (ret != 0) {
         tloge("Failed to unregister agent %u, ret is %d\n", agentId, ret);
         result = TEEC_ERROR_GENERIC;

@@ -13,6 +13,7 @@
 #ifndef TEE_LOAD_DYNAMIC_DRV_H
 #define TEE_LOAD_DYNAMIC_DRV_H
 
-void LoadDynamicDir(void);
-
+void LoadDynamicCryptoDir(void);
+void LoadDynamicDrvDir(void);
+void LoadDynamicSrvDir(void);
 #endif
