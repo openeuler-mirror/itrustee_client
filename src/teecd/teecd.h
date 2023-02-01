@@ -9,14 +9,10 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
-#ifndef LIBTEEC_EXT_API_H
-#define LIBTEEC_EXT_API_H
 
-#include <stdint.h>
-#include "tee_auth_common.h"
+#ifndef _TEE_TEECD_H_
+#define _TEE_TEECD_H_
 
-#define TC_NS_SOCKET_NAME        "#tc_ns_socket"
-
-int CaDaemonConnectWithCaInfo(const CaAuthInfo *caInfo, int cmd, const TEEC_XmlParameter *halXmlPtr);
+int teecd_main(void);
 
 #endif

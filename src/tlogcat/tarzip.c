@@ -186,7 +186,7 @@ static int32_t OpenZipFile(const char *outputName, gzFile *outFile, gid_t pathGr
         gzclose(out);
         return -1;
     }
-    ret = fchmod(fd, S_IRUSR | S_IWUSR | S_IRGRP);
+    ret = fchmod(fd, S_IRUSR | S_IRGRP);
     if (ret < 0) {
         tloge("chmod failed\n");
         gzclose(out);

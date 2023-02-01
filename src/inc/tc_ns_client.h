@@ -13,7 +13,6 @@
 #ifndef _TC_NS_CLIENT_H_
 #define _TC_NS_CLIENT_H_
 #include "tee_client_type.h"
-#include "cap_bit.h"
 #define TC_DEBUG
 
 #define INVALID_TYPE         0x00
@@ -24,9 +23,17 @@
 #endif
 
 #define UUID_SIZE      16
+
 #define TC_NS_CLIENT_IOC_MAGIC 't'
 #define TC_NS_CLIENT_DEV       "tc_ns_client"
 #define TC_NS_CLIENT_DEV_NAME  "/dev/tc_ns_client"
+#define TC_TEECD_PRIVATE_DEV_NAME  "/dev/tc_private"
+
+enum ConnectCmd {
+    GET_FD,
+    GET_TEEVERSION,
+    SET_SYS_XML,
+};
 
 typedef struct {
     unsigned int method;
@@ -35,28 +42,18 @@ typedef struct {
 
 typedef union {
     struct {
-        CAP_BITF(
-        unsigned int buffer,
-        unsigned int buffer_h_addr
-        )
-        CAP_BITF(
-        unsigned int offset,
-        unsigned int h_offset
-        )
-        CAP_BITF(
-        unsigned int size_addr,
-        unsigned int size_h_addr
-        )
+        unsigned int buffer;
+        unsigned int buffer_h_addr;
+        unsigned int offset;
+        unsigned int h_offset;
+        unsigned int size_addr;
+        unsigned int size_h_addr;
     } memref;
     struct {
-        CAP_BITF(
-        unsigned int a_addr,
-        unsigned int a_h_addr
-        )
-        CAP_BITF(
-        unsigned int b_addr,
-        unsigned int b_h_addr
-        )
+        unsigned int a_addr;
+        unsigned int a_h_addr;
+        unsigned int b_addr;
+        unsigned int b_h_addr;
     } value;
 } TC_NS_ClientParam;
 
@@ -78,7 +75,10 @@ typedef struct {
     unsigned int file_size;
     union {
         char *file_buffer;
-        unsigned long long file_addr;
+        struct {
+            uint32_t file_addr;
+            uint32_t file_h_addr;
+        } memref;
     };
 } TC_NS_ClientContext;
 
@@ -96,15 +96,23 @@ enum SecFileType {
     LOAD_TYPE_MAX
 };
 
-struct SecLoadIoctlStruct {
+struct SecFileInfo {
     enum SecFileType fileType;
-    TEEC_UUID uuid;
     uint32_t fileSize;
+    int32_t secLoadErr;
+};
+
+struct SecLoadIoctlStruct {
+    struct SecFileInfo secFileInfo;
+    TEEC_UUID uuid;
     union {
         char *fileBuffer;
-        unsigned long long fileAddr;
+        struct {
+            uint32_t file_addr;
+            uint32_t file_h_addr;
+        } memref;
     };
-};
+}__attribute__((packed));
 
 struct AgentIoctlArgs {
     uint32_t id;
@@ -113,14 +121,6 @@ struct AgentIoctlArgs {
         void *buffer;
         unsigned long long addr;
     };
-};
-
-struct TC_NS_ClientCrl {
-    union {
-        uint8_t *buffer;
-        unsigned long long addr;
-    };
-    uint32_t size;
 };
 
 #define TC_NS_CLIENT_IOCTL_SES_OPEN_REQ                   _IOW(TC_NS_CLIENT_IOC_MAGIC, 1, TC_NS_ClientContext)
@@ -143,7 +143,6 @@ struct TC_NS_ClientCrl {
 #define TC_NS_CLIENT_IOCTL_LOAD_TTF_FILE_AND_NOTCH_HEIGHT _IOWR(TC_NS_CLIENT_IOC_MAGIC, 19, unsigned int)
 #define TC_NS_CLIENT_IOCTL_LATEINIT                       _IOWR(TC_NS_CLIENT_IOC_MAGIC, 20, unsigned int)
 #define TC_NS_CLIENT_IOCTL_GET_TEE_VERSION                _IOWR(TC_NS_CLIENT_IOC_MAGIC, 21, unsigned int)
-#define TC_NS_CLIENT_IOCTL_UPDATE_TA_CRL                  _IOWR(TC_NS_CLIENT_IOC_MAGIC, 22, struct TC_NS_ClientCrl)
 
 TEEC_Result TEEC_CheckOperation(const TEEC_Operation *operation);
 #endif

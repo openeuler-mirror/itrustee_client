@@ -157,17 +157,14 @@ static void ChownSecStorageDataToSystem(const char *path, bool flag)
      * we only need to change SEC_STORAGE_DATA_DIR from root to system
      */
     if (strstr(path, "sec_storage_data") != NULL) {
-        int32_t ret = chown(path, AID_SYSTEM, AID_SYSTEM);
-        if (ret < 0) {
-            tloge("chown erro\n");
-        }
+        int32_t ret;
         if (flag) {
             ret = chmod(path, S_IRUSR | S_IWUSR);
         } else {
             ret = chmod(path, S_IRUSR | S_IWUSR | S_IXUSR);
         }
         if (ret < 0) {
-            tloge("chmod erro\n");
+            tloge("chmod error\n");
         }
     }
 }
@@ -252,44 +249,10 @@ static int32_t CheckFileNameAndPath(const char *name, const char *path)
     return 0;
 }
 
-#ifdef SEC_STORAGE_DATA_MDC_PATH
-static int32_t CheckEnvPath(const char* envPath, char* trustPath, size_t trustPathLen)
-{
-    struct stat st;
-
-    if (strlen(envPath) > trustPathLen) {
-        tloge("too long envPath\n");
-        return -1;
-    }
-    char *retPath = realpath(envPath, trustPath);
-    if (retPath == NULL) {
-        tloge("error envpath\n");
-        return -1;
-    }
-
-    if (stat(trustPath, &st) < 0) {
-        tloge("stat failed, errno is %x\n", errno);
-        return -1;
-    }
-    if (!S_ISDIR(st.st_mode)) {
-        tloge("error path: is not a dir\n");
-        return -1;
-    }
-    size_t pathLen = strlen(trustPath);
-    if (pathLen >= trustPathLen - 1) {
-        tloge("too long to add / \n");
-        return -1;
-    }
-    trustPath[pathLen] = '/';
-    trustPath[pathLen + 1] = '\0';
-    return 0;
-}
-#endif
-
 static int32_t GetPathStorage(char *path, size_t pathLen, const char *env)
 {
     errno_t rc;
-    char *defaultPath = NULL;
+    const char *defaultPath = NULL;
 
     if (strncmp(env, "SFS_PARTITION_TRANSIENT", strlen("SFS_PARTITION_TRANSIENT")) == 0) {
         defaultPath = USER_DATA_DIR;
@@ -298,18 +261,7 @@ static int32_t GetPathStorage(char *path, size_t pathLen, const char *env)
     } else {
         return -1;
     }
-#ifdef SEC_STORAGE_DATA_MDC_PATH
-    const char *envPath = getenv(env);
-    if (envPath == NULL) {
-        tloge("envPath is NULL.\n");
-        return -1;
-    }
-    char trustPath[PATH_MAX] = { 0 };
-    if (CheckEnvPath(envPath, trustPath, PATH_MAX) != 0) {
-        return -1;
-    }
-    defaultPath = trustPath;
-#endif
+
     rc = strncpy_s(path, pathLen, defaultPath, strlen(defaultPath) + 1);
     if (rc != EOK) {
         tloge("strncpy_s failed %d\n", rc);
@@ -390,7 +342,6 @@ static int32_t GetDefaultDir(char *path, size_t pathLen)
     if (ret != 0) {
         return ret;
     }
-
     rc = strncat_s(path, pathLen, SFS_PARTITION_PERSISTENT, strlen(SFS_PARTITION_PERSISTENT));
     if (rc != EOK) {
         tloge("strncat_s failed %d\n", rc);
@@ -540,6 +491,10 @@ static bool IsRootDir(const char *path)
 
 static bool IsValidFilePath(const char *path)
 {
+    if (strstr(path, "..") != NULL) {
+        tloge("filename should not include .. dir\n");
+        return false;
+    }
     if (IsDataDir(path, false) || IsDataDir(path, true) || IsRootDir(path) ||
         (path == strstr(path, SEC_STORAGE_DATA_CE))) {
         return true;
@@ -675,7 +630,6 @@ static int32_t IsFileExist(const char *name)
             return 0;
         }
     }
-
     return 1;
 }
 
@@ -756,7 +710,6 @@ static void OpenWork(struct SecStorageType *transControl)
         error = (uint32_t)errno;
         goto ERROR;
     }
-
     error = DoOpenFile(nameBuff, transControl);
     if (error != 0) {
         goto ERROR;
@@ -1282,14 +1235,11 @@ void *FsWorkThread(void *control)
 
     transControl->magic = AGENT_FS_ID;
     while (1) {
-        tlogv("++ fs agent loop ++\n");
-        ret = ioctl(fsFd, (int32_t)TC_NS_CLIENT_IOCTL_WAIT_EVENT, AGENT_FS_ID);
+        ret = ioctl(fsFd, TC_NS_CLIENT_IOCTL_WAIT_EVENT, AGENT_FS_ID);
         if (ret != 0) {
             tloge("fs agent  wait event failed\n");
             break;
         }
-
-        tlogv("fs agent wake up and working!!\n");
 
         if (IsUserDataReady() == 0) {
             transControl->ret = -1;
@@ -1313,9 +1263,9 @@ void *FsWorkThread(void *control)
         __asm__ volatile("isb");
         __asm__ volatile("dsb sy");
 
-        ret = ioctl(fsFd, (int32_t)TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, AGENT_FS_ID);
+        ret = ioctl(fsFd, TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, AGENT_FS_ID);
         if (ret != 0) {
-            tloge("fs agent send reponse failed\n");
+            tloge("fs agent send response failed\n");
             break;
         }
         tlogv("-- fs agent loop --\n");

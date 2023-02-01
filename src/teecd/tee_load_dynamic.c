@@ -16,6 +16,7 @@
 
 #include "securec.h"
 #include "tc_ns_client.h"
+#include "tee_load_sec_file.h"
 #include "tee_log.h"
 #include "secfile_load_agent.h"
 
@@ -24,14 +25,14 @@
 #endif
 #define LOG_TAG "teecd_load_dynamic"
 
-#if defined(DYNAMIC_DRV_DIR) || defined(DYNAMIC_SRV_DIR)
+#if defined(DYNAMIC_DRV_DIR) || defined(DYNAMIC_CRYPTO_DRV_DIR) || defined(DYNAMIC_SRV_DIR)
 #define MAX_FILE_NAME_LEN 64
 
 static DIR *OpenDynamicDir(const char *dynDir)
 {
     DIR *dir = opendir(dynDir);
     if (dir == NULL) {
-        tloge("Open drv dir: %s failed\n", dynDir);
+        tloge("open drv dir: %s failed\n", dynDir);
     }
 
     return dir;
@@ -44,39 +45,37 @@ static int32_t LoadOneFile(const char *dynDir, const struct dirent *dirFile, int
     int32_t ret = -1;
 
     if (strcmp(dirFile->d_name, ".") == 0 || strcmp(dirFile->d_name, "..") == 0) {
-        tloge("No need to load\n");
+        tlogd("no need to load\n");
         goto END;
     }
 
     if (strstr(dirFile->d_name, ".sec") == NULL) {
-        tloge("Only support sec file\n");
+        tloge("only support sec file\n");
         goto END;
     }
 
     if (memset_s(name, sizeof(name), 0, sizeof(name)) != 0) {
-        tloge("Mem set failed, name: %s, size: %u\n", name, (uint32_t)sizeof(name));
+        tloge("mem set failed, name: %s, size: %u\n", name, (uint32_t)sizeof(name));
         goto END;
     }
-
     if (strcat_s(name, MAX_FILE_NAME_LEN, dynDir) != 0) {
-        tloge("Dir name too long: %s\n", dynDir);
+        tloge("dir name too long: %s\n", dynDir);
         goto END;
     }
-
     if (strcat_s(name, MAX_FILE_NAME_LEN, dirFile->d_name) != 0) {
-        tloge("Drv name too long: %s\n", dirFile->d_name);
+        tloge("drv name too long: %s\n", dirFile->d_name);
         goto END;
     }
 
     fp = fopen(name, "r");
     if (fp == NULL) {
-        tloge("Open drv failed: %s\n", name);
-	goto END;
+        tloge("open drv failed: %s\n", name);
+        goto END;
     }
 
-    ret = LoadSecFile(fd, fp, loadType, NULL);
+    ret = LoadSecFile(fd, fp, loadType, NULL, NULL);
     if (ret != 0) {
-        tloge("Load dynamic failed: %s\n", name);
+        tloge("load dynamic failed: %s\n", name);
     }
 
 END:
@@ -94,28 +93,39 @@ static void LoadOneDynamicDir(int32_t fd, const char *dynDir, uint32_t loadType)
 
     DIR *dir = OpenDynamicDir(dynDir);
     if (dir == NULL) {
-        tloge("Dynamic dir not exist\n");
-	return;
+        tloge("dynamic dir not exist\n");
+        return;
     }
     while ((dirFile = readdir(dir)) != NULL) {
         ret = LoadOneFile(dynDir, dirFile, fd, loadType);
-	if (ret != 0) {
-            tloge("Load dynamic failed\n");
-            continue;	    
+        if (ret != 0) {
+            tlogd("load dynamic failed\n");
+            continue;
         }
     }
     (void)closedir(dir);
 }
 
-void LoadDynamicDir()
+void LoadDynamicCryptoDir(void)
 {
+#ifdef DYNAMIC_CRYPTO_DRV_DIR
     int32_t fd = GetSecLoadAgentFd();
+    LoadOneDynamicDir(fd, DYNAMIC_CRYPTO_DRV_DIR, LOAD_DYNAMIC_DRV);
+#endif
+}
 
+void LoadDynamicDrvDir(void)
+{
 #ifdef DYNAMIC_DRV_DIR
+    int32_t fd = GetSecLoadAgentFd();
     LoadOneDynamicDir(fd, DYNAMIC_DRV_DIR, LOAD_DYNAMIC_DRV);
 #endif
+}
 
+void LoadDynamicSrvDir(void)
+{
 #ifdef DYNAMIC_SRV_DIR
+    int32_t fd = GetSecLoadAgentFd();
     LoadOneDynamicDir(fd, DYNAMIC_SRV_DIR, LOAD_SERVICE);
 #endif
 }

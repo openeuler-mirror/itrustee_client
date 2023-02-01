@@ -13,6 +13,7 @@
 #include "tee_auth_common.h"
 #include <stdbool.h>
 #include <errno.h>
+#include "tee_client_constants.h"
 #include "securec.h"
 #include "tee_log.h"
 
@@ -115,7 +116,7 @@ int TeeGetUserName(unsigned int caUid, char *userName, size_t nameBufLen)
         }
     }
 
-    fclose(fd);
+    (void)fclose(fd);
     return -1;
 }
 
@@ -180,23 +181,23 @@ static int ParsePkgName(const char *cmdLine, size_t cmdLen, char *caName, size_t
     return 0;
 }
 
-static int ReadCmdLine(const char *path, char *buffer, int bufferLen, char *caName, size_t nameLen)
+static int ReadCmdLine(const char *path, char *buffer, size_t bufferLen, char *caName, size_t nameLen)
 {
     FILE *fd = fopen(path, "rb");
     if (fd == NULL) {
         tloge("fopen is error: %d\n", errno);
         return -1;
     }
-    int bytesRead = fread(buffer, sizeof(char), bufferLen - 1, fd);
-    bool readError = bytesRead <= 0 || ferror(fd);
+    int bytesRead = (int)fread(buffer, sizeof(char), bufferLen - 1, fd);
+    bool readError = (bytesRead <= 0 || (ferror(fd) != 0));
     if (readError) {
         tloge("cannot read from cmdline\n");
         fclose(fd);
         return -1;
     }
-    fclose(fd);
+    (void)fclose(fd);
 
-    int firstStringLen = (int)strnlen(buffer, bufferLen - 1);
+    size_t firstStringLen = strnlen(buffer, bufferLen - 1);
     errno_t res = strncpy_s(caName, nameLen - 1, buffer, firstStringLen);
     if (res != EOK) {
         tloge("copy caName failed\n");
@@ -262,3 +263,47 @@ int TeeGetPkgName(int caPid, char *path, size_t pathLen)
     return 0;
 }
 
+static int TeeCheckCaPath(unsigned int uid, int pid, const char *auth_ctx)
+{
+    char path[MAX_PATH_LENGTH] = { 0 };
+    char str_path_uid[BUF_MAX_SIZE] = { 0 };
+
+    if (auth_ctx == NULL) {
+        tloge("bad params\n");
+        return TEEC_ERROR_ACCESS_DENIED;
+    }
+
+    size_t auth_ctx_len = strnlen(auth_ctx, MAX_PATH_LENGTH);
+    if (auth_ctx_len == 0 || auth_ctx_len >= MAX_PATH_LENGTH) {
+        tloge("invalid path context\n");
+        return TEEC_ERROR_ACCESS_DENIED;
+    }
+
+    if (TeeGetCaName(pid, path, sizeof(path)) < 0) {
+        tloge("get ca name failed\n");
+        return TEEC_ERROR_ACCESS_DENIED;
+    }
+
+    if (snprintf_s((char *)str_path_uid, sizeof(str_path_uid), sizeof(str_path_uid) - 1, "%s:%u", path, uid) == -1) {
+        tloge("snprintf_s failed!\n");
+        return TEEC_ERROR_ACCESS_DENIED;
+    }
+
+    if (strncmp(str_path_uid, auth_ctx, auth_ctx_len) != 0) {
+        tloge("check path failed\n");
+        return TEEC_ERROR_ACCESS_DENIED;
+    }
+
+    return 0;
+}
+
+int TeeCheckHidlAuth(unsigned int uid, int pid)
+{
+    int ret = TeeCheckCaPath(uid, pid, CA_HIDL_PATH_UID_AUTH_CTX);
+    if (ret != 0) {
+        tloge("check hidl path failed, ret %d\n", ret);
+        return ret;
+    }
+
+    return 0;
+}

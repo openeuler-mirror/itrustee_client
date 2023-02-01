@@ -175,9 +175,8 @@ TEEC_Result TEEC_SessionPoolCreate(TEEC_Context *context, const TEEC_UUID *desti
 
     /* req will be freed in child thread */
     req->reqCount = sp->poolSize - 1;
-    int32_t err = pthread_create(&worker, NULL, &CreateSessionsFn, req);
-    if (err != 0) {
-        tloge("create worker failed, error = %d\n", err);
+    if (pthread_create(&worker, NULL, &CreateSessionsFn, req) != 0) {
+        tloge("create worker failed, error = %d\n", errno);
         ret = TEEC_ERROR_GENERIC;
         goto error;
     }
@@ -226,7 +225,7 @@ static TEEC_Session *GetSessionFromPool(struct SessionPool *sp, int32_t *index)
 static void PutSessionToPool(struct SessionPool *sp, int32_t index)
 {
     (void)pthread_mutex_lock(&sp->usageLock);
-    SetBit(index, sp->usageSize, sp->usage);
+    SetBit((uint32_t)index, sp->usageSize, sp->usage);
     sp->inuse--;
     (void)pthread_mutex_unlock(&sp->usageLock);
 

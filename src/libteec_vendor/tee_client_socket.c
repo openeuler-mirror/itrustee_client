@@ -20,7 +20,6 @@
 #include <time.h>
 #include "tee_log.h"
 #include "tc_ns_client.h"
-#include "tee_ca_daemon.h"
 #include "tee_client_inner.h"
 
 #ifdef LOG_TAG
@@ -63,7 +62,7 @@ static int ConnectTeecdSocket(int *socketFd)
         close(s);
         return -1;
     }
-    len = strlen(remote.sun_path) + sizeof(remote.sun_family);
+    len = (uint32_t)(strlen(remote.sun_path) + sizeof(remote.sun_family));
     remote.sun_path[0] = 0;
 
     if (connect(s, (struct sockaddr *)&remote, len) == -1) {
@@ -81,8 +80,8 @@ static int ConnectTeecdSocket(int *socketFd)
     return 0;
 }
 
-static int InitRecvMsg(struct msghdr *recvMsg, struct iovec *iov, int iovLen,
-                       char *ctrlBuf, int ctrlBufLen)
+static int InitRecvMsg(struct msghdr *recvMsg, struct iovec *iov, size_t iovLen,
+                       char *ctrlBuf, size_t ctrlBufLen)
 {
     if (recvMsg == NULL || iov == NULL || ctrlBuf == NULL) {
         tloge("param error!\n");
@@ -148,7 +147,7 @@ static int RecvFileDescriptor(int cmd, int socketFd)
     /* Iterate through header to find if there is a file descriptor */
     for (controlMsg = CMSG_FIRSTHDR(&hmsg); controlMsg != NULL; controlMsg = CMSG_NXTHDR(&hmsg, controlMsg)) {
         if ((controlMsg->cmsg_level == SOL_SOCKET) && (controlMsg->cmsg_type == SCM_RIGHTS)) {
-            cmdata = (int *)CMSG_DATA(controlMsg);
+            cmdata = (int *)(uintptr_t)CMSG_DATA(controlMsg);
             return *cmdata;
         }
     }
@@ -171,7 +170,7 @@ static int FillMsgBuffer(const CaAuthInfo *caInfo, CaRevMsg **revMsg, int cmd, c
     }
     int temp = memcpy_s(&(revBuffer->caAuthInfo), sizeof(CaAuthInfo), caInfo, sizeof(*caInfo));
     if (temp != EOK) {
-        tloge("memcpy_s erro!\n");
+        tloge("memcpy_s error!\n");
         free(revBuffer);
         return -1;
     }
@@ -180,7 +179,7 @@ static int FillMsgBuffer(const CaAuthInfo *caInfo, CaRevMsg **revMsg, int cmd, c
         revBuffer->xmlBufSize = halXmlPtr->fileSize;
         temp = memcpy_s(revBuffer->xmlBuffer, HASH_FILE_MAX_SIZE, halXmlPtr->fileBuf, halXmlPtr->fileSize);
         if (temp != EOK) {
-            tloge("memcpy_s erro!\n");
+            tloge("memcpy_s error!\n");
             free(revBuffer);
             return -1;
         }
@@ -254,7 +253,7 @@ int CaDaemonConnectWithCaInfo(const CaAuthInfo *caInfo, int cmd, const TEEC_XmlP
     }
 
     if (FillMsgBuffer(caInfo, &revMsg, cmd, halXmlPtr) != EOK) {
-        tloge("memcpy_s erro!\n");
+        tloge("memcpy_s error!\n");
         close(s);
         return -1;
     }

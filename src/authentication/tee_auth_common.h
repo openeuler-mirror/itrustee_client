@@ -15,6 +15,7 @@
 
 #include <stdint.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 
 #ifdef __cplusplus
@@ -22,13 +23,20 @@ extern "C" {
 #endif
 
 #define MAX_PATH_LENGTH        256
+
 #define MAX_NAME_LENGTH        256
+
 #define BUF_MAX_SIZE           4096
 #define CMD_MAX_SIZE           1024
 #define BACKLOG_LEN            10
 #define HASH_FILE_MAX_SIZE     (16 * 1024)
 #define MEDIA_CODEC_PATH       "media.codec"
 #define OMX_PATH               "/vendor/bin/hw/android.hardware.media.omx@1.0-service"
+#define MAX_SCTX_LEN           128
+
+#ifndef CA_HIDL_PATH_UID_AUTH_CTX
+#define CA_HIDL_PATH_UID_AUTH_CTX ""
+#endif
 
 typedef enum {
     SYSTEM_CA = 1,
@@ -62,7 +70,10 @@ typedef struct {
 #define NON_HIDL_SIDE 0xffe1
 
 int TeeGetPkgName(int caPid, char *path, size_t pathLen);
+
 int TeeGetUserName(unsigned int caUid, char *userName, size_t nameLen);
+
+int TeeCheckHidlAuth(unsigned int uid, int pid);
 
 #ifdef __cplusplus
 }

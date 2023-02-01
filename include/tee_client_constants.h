@@ -58,7 +58,8 @@ enum TEEC_ReturnCode {
     TEEC_ERROR_STORAGE_NO_SPACE  = 0xFFFF3041,  /* used by adapt only */
     TEEC_ERROR_SIGNATURE_INVALID = 0xFFFF3072,  /* used by adapt only */
     TEEC_ERROR_TIME_NOT_SET      = 0xFFFF5000,  /* used by adapt only */
-    TEEC_ERROR_TIME_NEEDS_RESET  = 0xFFFF5001   /* used by adapt only */
+    TEEC_ERROR_TIME_NEEDS_RESET  = 0xFFFF5001,  /* used by adapt only */
+    TEEC_ERROR_IPC_OVERFLOW      = 0xFFFF9114   /* ipc overflow */
 };
 
 enum TEEC_ReturnCodeOrigin {
@@ -69,10 +70,10 @@ enum TEEC_ReturnCodeOrigin {
 };
 
 enum TEEC_SharedMemCtl {
-    TEEC_MEM_INPUT = 0x1,        /* input type of memroy */
-    TEEC_MEM_OUTPUT = 0x2,       /* output type of memory */
-    TEEC_MEM_INOUT = 0x3,        /* memory is used as both input and output */
-    TEEC_MEM_SHARED_INOUT = 0x4, /* no copy shared memory */
+    TEEC_MEM_INPUT = 0x1,  /* input type of memroy */
+    TEEC_MEM_OUTPUT = 0x2, /* output type of memory */
+    TEEC_MEM_INOUT = 0x3,  /* memory is used as both input and output */
+    TEEC_MEM_SHARED_INOUT = 0x4,  /* no copy shared memory */
 };
 
 enum TEEC_ParamType {

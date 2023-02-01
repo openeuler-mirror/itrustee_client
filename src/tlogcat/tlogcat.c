@@ -70,8 +70,6 @@ struct LogFile {
     char logName[FILE_NAME_MAX_BUF];
 };
 static struct LogFile *g_files = NULL;
-static char *g_compressFile = NULL;
-static struct TeeUuid g_compressUuid;
 char *g_logBuffer = NULL;
 
 /* for ioctl */
@@ -185,13 +183,13 @@ static struct LogFile *LogFilesAdd(const struct TeeUuid *uuid, const char *logNa
 
         rc = memcpy_s(g_files[i].logName, sizeof(g_files[i].logName), logName, strlen(logName) + 1);
         if (rc != EOK) {
-            tloge("Memcpy log name failed\n");
+            tloge("memcpy log name failed\n");
             goto CLOSE_F;
         }
 
         rc = memcpy_s(&g_files[i].uuid, sizeof(g_files[i].uuid), uuid, sizeof(struct TeeUuid));
         if (rc != EOK) {
-            tloge("Memcpy uuid failed\n");
+            tloge("memcpy uuid failed\n");
             goto CLOSE_F;
         }
 
@@ -223,6 +221,14 @@ static FILE *LogFilesOpen(const char *logName, long *fileLen)
     int32_t ret;
     FILE *file = NULL;
     bool isNewFile = false;
+
+    if (access(logName, F_OK) == 0) {
+        ret = chmod(logName, S_IRUSR | S_IWUSR | S_IRGRP);
+        if (ret != 0) {
+            tloge("open chmod error, ret: %d, file:%s\n", ret, logName);
+            return NULL;
+        }
+    }
 
     int32_t fd1 = open(logName, O_WRONLY);
     if (fd1 < 0) {
@@ -264,7 +270,7 @@ static FILE *LogFilesOpen(const char *logName, long *fileLen)
     if (isNewFile) {
         size_t ret1 = fwrite(g_teeVersion, 1, strlen(g_teeVersion), file);
         if (ret1 == 0) {
-            tloge("write tee verion to %s failed %zu\n", logName, ret1);
+            tloge("write tee version to %s failed %zu\n", logName, ret1);
         }
     }
 
@@ -306,22 +312,25 @@ static int32_t LogAssembleFilename(char *logName, size_t logNameLen,
     const char *logPath, const struct FileNameAttr *nameAttr)
 {
     if (nameAttr->isTa) {
-        return snprintf_s(logName, logNameLen, strlen(LOG_FILE_TA_DEMO) + strlen(logPath), "%s%s%s-%u",
+        return snprintf_s(logName, logNameLen, logNameLen - 1, "%s%s%s-%u",
             logPath, "LOG@", nameAttr->uuidAscii, nameAttr->index);
     } else {
-        return snprintf_s(logName, logNameLen, strlen(LOG_FILE_TEE_DEMO) + strlen(logPath), "%s%s-%u",
+        return snprintf_s(logName, logNameLen, logNameLen - 1, "%s%s-%u",
             logPath, "teeOS_log", nameAttr->index);
     }
 }
+
+static char *g_compressFile = NULL;
+static struct TeeUuid g_compressUuid;
 
 static int32_t LogAssembleCompressFilename(char *logName, size_t logNameLen,
     const char *logPath, const struct FileNameAttr *nameAttr)
 {
     if (nameAttr->isTa) {
-        return snprintf_s(logName, logNameLen, strlen(LOG_FILE_TA_COMPRESS_DEMO) + strlen(logPath),
+        return snprintf_s(logName, logNameLen, logNameLen - 1,
             "%s%s%s-%u.tar.gz", logPath, "LOG@", nameAttr->uuidAscii, nameAttr->index);
     } else {
-        return snprintf_s(logName, logNameLen, strlen(LOG_FILE_TEE_COMPRESS_DEMO) + strlen(logPath),
+        return snprintf_s(logName, logNameLen, logNameLen - 1,
             "%s%s-%u.tar.gz", logPath, "teeos-log", nameAttr->index);
     }
 }
@@ -347,8 +356,12 @@ static void TriggerCompress(void)
         SetFileNameAttr(&nameAttr, uuidAscii, isTa, i);
         ret = LogAssembleFilename(filesToCompress[i], FILE_NAME_MAX_BUF, g_teeTempPath, &nameAttr);
         if (ret < 0) {
-            tloge("Snprintf file to compress error %d %s, %s, %u\n", ret, g_teeTempPath, uuidAscii, i);
+            tloge("snprintf file to compress error %d %s, %s, %u\n", ret, g_teeTempPath, uuidAscii, i);
             continue;
+        }
+        ret = chmod(filesToCompress[i], S_IRUSR | S_IWUSR | S_IRGRP);
+        if (ret != 0) {
+           tloge("trigger compress chmod failed\n");
         }
     }
 
@@ -393,7 +406,7 @@ static char *GetCompressFile(const struct TeeUuid *uuid)
         SetFileNameAttr(&nameAttr, g_uuidAscii, isTa, i);
         rc = LogAssembleCompressFilename(g_logNameCompress, sizeof(g_logNameCompress), g_teePath, &nameAttr);
         if (rc < 0) {
-            tloge("Snprintf log name compresserror error %d %s %s %u\n", rc, g_teePath, g_uuidAscii, i);
+            tloge("snprintf log name compresserror error %d %s %s %u\n", rc, g_teePath, g_uuidAscii, i);
             continue;
         }
 
@@ -436,7 +449,7 @@ static void ArrangeCompressFile(const struct TeeUuid *uuid)
         SetFileNameAttr(&nameAttr, g_uuidAscii, isTa, i);
         ret = LogAssembleCompressFilename(g_logNameCompress, sizeof(g_logNameCompress), g_teePath, &nameAttr);
         if (ret < 0) {
-            tloge("Snprintf log name compress error %d %s %s %u\n", ret, g_teePath, g_uuidAscii, i);
+            tloge("snprintf log name compress error %d %s %s %u\n", ret, g_teePath, g_uuidAscii, i);
             continue;
         }
 
@@ -492,7 +505,7 @@ static void LogTmpDirClear(const char *tmpPath)
         ret = snprintf_s(filePathName, sizeof(filePathName), sizeof(filePathName) - 1,
             "%s/%s", tmpPath, de->d_name);
         if (ret == -1) {
-            tloge("get fiel path name failed %d\n", ret);
+            tloge("get file path name failed %d\n", ret);
             de = readdir(dir);
             continue;
         }
@@ -535,13 +548,13 @@ static void MoveFileToTmpPath(bool isTa, uint32_t index)
     SetFileNameAttr(&nameAttr, g_uuidAscii, isTa, index);
     ret = LogAssembleFilename(g_logName, sizeof(g_logName), g_teePath, &nameAttr);
     if (ret < 0) {
-        tloge("Snprintf log name error %d %s %s %u\n", ret, g_teePath, g_uuidAscii, index);
+        tloge("snprintf log name error %d %s %s %u\n", ret, g_teePath, g_uuidAscii, index);
         return;
     }
 
     ret = LogAssembleFilename(g_logNameCompress, sizeof(g_logNameCompress), g_teeTempPath, &nameAttr);
     if (ret < 0) {
-        tloge("Snprintf log name compress error %d %s %s %u\n", ret, g_teeTempPath, g_uuidAscii, index);
+        tloge("snprintf log name compress error %d %s %s %u\n", ret, g_teeTempPath, g_uuidAscii, index);
         return;
     }
 
@@ -616,20 +629,26 @@ static void LogFileFull(uint32_t fileNum)
     SetFileNameAttr(&nameAttr, uuidAscii, isTa, 0);
     rc = LogAssembleFilename(logName, sizeof(logName), g_teePath, &nameAttr);
     if (rc < 0) {
-        tloge("Snprintf log name error %d %s %s %d\n", rc, g_teePath, uuidAscii, 0);
+        tloge("snprintf log name error %d %s %s %d\n", rc, g_teePath, uuidAscii, 0);
         return;
     }
 
     SetFileNameAttr(&nameAttr, uuidAscii, isTa, g_files[fileNum].fileIndex + 1);
     rc = LogAssembleFilename(logName2, sizeof(logName2), g_teePath, &nameAttr);
     if (rc < 0) {
-        tloge("Snprintf log name2 error %d %s %s %u\n", rc, g_teePath, uuidAscii, g_files[fileNum].fileIndex + 1);
+        tloge("snprintf log name2 error %d %s %s %u\n", rc, g_teePath, uuidAscii, g_files[fileNum].fileIndex + 1);
         return;
     }
 
     rc = rename(logName, logName2);
     if (rc < 0) {
         tloge("file full and rename error %s, %s, %d, errno %d\n", logName, logName2, rc, errno);
+        return;
+    }
+
+    rc = chmod(logName2, S_IRUSR | S_IRGRP);
+    if (rc != 0) {
+        tloge("chmod file: %s failed, ret: %d\n", logName2, rc);
     }
 
     return;
@@ -706,7 +725,7 @@ static void GetFileIndex(const char *uuidAscii, bool isTa, uint32_t *fileIndex)
         SetFileNameAttr(&nameAttr, uuidAscii, isTa, (uint32_t)i);
         ret = LogAssembleFilename(logName, sizeof(logName), g_teePath, &nameAttr);
         if (ret < 0) {
-            tloge("Snprintf log name error %d %s %s %d\n", ret, g_teePath, uuidAscii, i);
+            tloge("snprintf log name error %d %s %s %d\n", ret, g_teePath, uuidAscii, i);
             continue;
         }
 
@@ -749,7 +768,7 @@ static struct LogFile *LogFilesGet(const struct TeeUuid *uuid, bool isTa)
     SetFileNameAttr(&nameAttr, uuidAscii, isTa, 0);
     rc = LogAssembleFilename(logName, sizeof(logName), g_teePath, &nameAttr);
     if (rc < 0) {
-        tloge("Snprintf log name error %d %s %s\n", rc, g_teePath, uuidAscii);
+        tloge("snprintf log name error %d %s %s\n", rc, g_teePath, uuidAscii);
         return NULL;
     }
 
@@ -790,6 +809,11 @@ static void LogFilesClose(void)
                 /* this file is full */
                 LogFileFull(i);
             }
+        }
+
+        int32_t ret = chmod(g_files[i].logName, S_IRUSR | S_IRGRP);
+        if (ret != 0) {
+            tloge("close chmod file: %s failed, ret: %d\n", g_files[i].logName, ret);
         }
 
         (void)memset_s(&g_files[i], sizeof(g_files[i]), 0, sizeof(g_files[i]));
@@ -968,10 +992,10 @@ static int32_t ProcReadLog(bool writeFile, const fd_set *readset)
     READ_RETRY:
         ret = read(g_devFd, g_logBuffer, LOG_BUFFER_LEN);
         if (ret == 0) {
-            tlogd("tlogcat read no data:ret = %zd\n", ret);
+            tlogd("tlogcat read no data:ret=%zd\n", ret);
             return -1;
         } else if (ret < 0) {
-            tloge("tlogcat read failed:ret = %zd\n", ret);
+            tloge("tlogcat read failed:ret=%zd\n", ret);
             return -1;
         } else if (ret > LOG_BUFFER_LEN) {
             tloge("invalid read length = %zd\n", ret);
@@ -1036,6 +1060,7 @@ static void Func(bool writeFile)
 
         /* close file */
         LogFilesClose();
+
         FreeTagNode();
     }
 
@@ -1047,21 +1072,21 @@ static void GetTeePathGroup(void)
     struct stat pathStat = {0};
     
     if (stat(TEE_LOG_PATH_BASE, &pathStat) != 0) {
-        tloge("Get base path stat failed\n");
+        tloge("get base path stat failed\n");
         return;
     }
     g_teePathGroup = pathStat.st_gid;
 }
 
-#define MAX_TEE_LOG_SUBFOLDER_LEN  30U
-#define TEE_COMPRESS_SUBFOLDER     "_tmp"
+#define MAX_TEE_LOG_SUBFOLDER_LEN      30U
+#define TEE_COMPRESS_SUBFOLDER         "_tmp"
 static int32_t GetTeeLogPath(void)
 {
     int32_t ret;
 
     if (strnlen(TEE_LOG_PATH_BASE, FILE_NAME_MAX_BUF) >= FILE_NAME_MAX_BUF ||
         strnlen(TEE_LOG_SUBFOLDER, MAX_TEE_LOG_SUBFOLDER_LEN) >= MAX_TEE_LOG_SUBFOLDER_LEN) {
-        tloge("Invalid tee path params cfg, please check make scripts\n");
+        tloge("invalid tee path params cfg, please check make scripts\n");
         return -1;
     }
 
@@ -1070,14 +1095,14 @@ static int32_t GetTeeLogPath(void)
     ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
         "%s/%s/", TEE_LOG_PATH_BASE, TEE_LOG_SUBFOLDER);
     if (ret < 0) {
-        tloge("Get tee log path failed\n");
+        tloge("get tee log path failed\n");
         return -1;
     }
 
     ret = snprintf_s(g_teeTempPath, sizeof(g_teeTempPath), sizeof(g_teeTempPath) - 1,
         "%s/%s/", g_teePath, TEE_COMPRESS_SUBFOLDER);
     if (ret < 0) {
-        tloge("Get tee temp log path failed\n");
+        tloge("get tee temp log path failed\n");
         return -1;
     }
     return 0;
@@ -1115,7 +1140,7 @@ static int32_t Prepare(void)
     /* get tee version info */
     ret = ioctl(g_devFd, TEELOGGER_GET_VERSION, g_teeVersion);
     if (ret != 0) {
-        tloge("get tee verison failed %d\n", ret);
+        tloge("get tee version failed %d\n", ret);
     }
 
     OpenTeeLog();

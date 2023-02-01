@@ -44,18 +44,26 @@ static int GetLoginInfoNonHidl(const struct ucred *cr, int fd, uint8_t *buf, uns
     return ret;
 }
 
+static int GetLoginInfo(const struct ucred *cr, const CaRevMsg *caRevInfo, int fd, uint8_t *buf, unsigned int bufLen)
+{
+    const CaAuthInfo *caInfo = &(caRevInfo->caAuthInfo);
+    if (caInfo->fromHidlSide == NON_HIDL_SIDE)
+        return GetLoginInfoNonHidl(cr, fd, buf, bufLen);
+
+    tloge("invalid connect request\n");
+    return -1;
+}
+
 int SendLoginInfo(const struct ucred *cr, const CaRevMsg *caRevInfo, int fd)
 {
     int ret;
-    unsigned int bufLen;
+    unsigned int bufLen = BUF_MAX_SIZE;
 
     if (cr == NULL || caRevInfo == NULL) {
         tloge("bad parameters\n");
         return -1;
     }
 
-    const CaAuthInfo *caInfo = &(caRevInfo->caAuthInfo);
-    bufLen = sizeof(caInfo->certs);
     uint8_t *buf = (uint8_t *)malloc(bufLen);
     if (buf == NULL) {
         tloge("malloc fail.\n");
@@ -67,16 +75,7 @@ int SendLoginInfo(const struct ucred *cr, const CaRevMsg *caRevInfo, int fd)
         goto END;
     }
 
-    if (caInfo->fromHidlSide == HIDL_SIDE) {
-        ret = GetLoginInfoHidl(cr, caRevInfo, fd, buf, bufLen);
-    } else if (caInfo->fromHidlSide == NON_HIDL_SIDE) {
-        tlogd("ca from vendor\n");
-        ret = GetLoginInfoNonHidl(cr, fd, buf, bufLen);
-    } else {
-        tloge("invalid connect request.\n");
-        ret = -1;
-    }
-
+    ret = GetLoginInfo(cr, caRevInfo, fd, buf, bufLen);
     if (ret != 0) {
         tloge("get cert failed\n");
         goto END;

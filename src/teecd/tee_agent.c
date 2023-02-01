@@ -17,9 +17,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include <sys/time.h>
 #include <time.h>
+#include <limits.h>
 #include "tc_ns_client.h"
 #include "tee_client_api.h"
 #include "tee_log.h"
@@ -27,6 +29,10 @@
 #include "secfile_load_agent.h"
 #include "misc_work_agent.h"
 #include "fs_work_agent.h"
+
+#if defined(DYNAMIC_DRV_DIR) || defined(DYNAMIC_CRYPTO_DRV_DIR) || defined(DYNAMIC_SRV_DIR)
+#include "tee_load_dynamic.h"
+#endif
 
 #ifdef LOG_TAG
 #undef LOG_TAG
@@ -55,23 +61,24 @@ static int AgentInit(unsigned int id, void **control)
     if (control == NULL) {
         return -1;
     }
-    int fd = open(TC_NS_CLIENT_DEV_NAME, O_RDWR);
+    int fd = open(TC_TEECD_PRIVATE_DEV_NAME, O_RDWR);
     if (fd < 0) {
         tloge("open tee client dev failed, fd is %d\n", fd);
         return -1;
     }
-
-    /* register agent */
     args.id         = id;
     args.bufferSize = TRANS_BUFF_SIZE;
-    ret             = ioctl(fd, (int)TC_NS_CLIENT_IOCTL_REGISTER_AGENT, &args);
+    ret             = ioctl(fd, TC_NS_CLIENT_IOCTL_REGISTER_AGENT, &args);
     if (ret != 0) {
         (void)close(fd);
-        tloge("ioctl failed\n");
+        tloge("private ioctl failed\n");
         return -1;
     }
-
+#if __SIZEOF_POINTER__ == 8
     *control = args.buffer;
+#else
+    *control = (void *)(uintptr_t)args.addr;
+#endif
     return fd;
 }
 
@@ -83,7 +90,7 @@ static void AgentExit(unsigned int id, int fd)
         return;
     }
 
-    ret = ioctl(fd, (int)TC_NS_CLIENT_IOCTL_UNREGISTER_AGENT, id);
+    ret = ioctl(fd, TC_NS_CLIENT_IOCTL_UNREGISTER_AGENT, id);
     if (ret != 0) {
         tloge("ioctl failed\n");
     }
@@ -156,7 +163,7 @@ static void ProcessAgentExit(void)
     g_secLoadAgentControl = NULL;
 }
 
-#define SEC_MIN         0xFFFFF
+#define SEC_MIN 0xFFFFF
 #define NSEC_PER_MILLIS 1000000
 static int SyncSysTimeToSecure(void)
 {
@@ -167,31 +174,31 @@ static int SyncSysTimeToSecure(void)
 
     ret = clock_gettime(CLOCK_REALTIME, &realTime);
     if (ret != 0) {
-        tloge("Get real time failed, ret=0x%x\n", ret);
+        tloge("get real time failed ret=0x%x\n", ret);
         return ret;
     }
-    
+
     ret = clock_gettime(CLOCK_MONOTONIC, &sysTime);
     if (ret != 0) {
-        tloge("Get system time failed, ret=0x%x\n", ret);
+        tloge("get system time failed ret=0x%x\n", ret);
         return ret;
     }
 
     if (realTime.tv_sec <= sysTime.tv_sec) {
-        tlogd("Real time is not ready\n");
+        tlogd("real time is not ready\n");
         return -1;
     }
     tcNsTime.seconds = (uint32_t)realTime.tv_sec;
-    tcNsTime.millis = realTime.tv_nsec / NSEC_PER_MILLIS;
+    tcNsTime.millis  = (uint32_t)(realTime.tv_nsec / NSEC_PER_MILLIS);
 
-    int fd = open(TC_NS_CLIENT_DEV_NAME, O_RDWR);
+    int fd = open(TC_TEECD_PRIVATE_DEV_NAME, O_RDWR);
     if (fd < 0) {
-        tloge("Failed to open %s: %d\n", TC_NS_CLIENT_DEV_NAME, errno);
+        tloge("Failed to open %s: %d\n", TC_TEECD_PRIVATE_DEV_NAME, errno);
         return fd;
     }
-    ret = ioctl(fd, (int)TC_NS_CLIENT_IOCTL_SYC_SYS_TIME, &tcNsTime);
+    ret = ioctl(fd, TC_NS_CLIENT_IOCTL_SYC_SYS_TIME, &tcNsTime);
     if (ret != 0) {
-        tloge("Failed to send sys time to teeos\n");
+        tloge("failed to send sys time to teeos\n");
     }
 
     close(fd);
@@ -206,20 +213,37 @@ void TrySyncSysTimeToSecure(void)
     if (syncSysTimed == 0) {
         ret = SyncSysTimeToSecure();
         if (ret != 0) {
-            tloge("Failed to sync sys time to secure\n");
+            tlogw("failed to sync sys time to secure\n");
         } else {
             syncSysTimed = 1;
         }
     }
 }
 
-int main(void)
+#ifdef CONFIG_LIBTEECD_SHARED
+__attribute__((constructor)) static void LibTeecdInit(void)
 {
-    pthread_t fsThread               = -1;
-    pthread_t miscThread             = -1;
-    pthread_t caDaemonThread         = -1;
-    pthread_t secfileLoadAgentThread = -1;
-    int32_t type = TEECD_CONNECT;
+    tlogd("checking LD_PRELOAD\n");
+    char *preload = getenv("LD_PRELOAD");
+    if (preload != NULL) {
+        tloge("LD_PRELOAD has been set to \"%s\"\n", preload);
+        tloge("alert: so library override operation detected, this process will be terminated\n");
+        exit(-1);
+    }
+    tlogd("so is secure\n");
+}
+#endif
+
+#ifdef CONFIG_LIBTEECD_SHARED
+int teecd_main(void)
+#else
+int main(void)
+#endif
+{
+    pthread_t fsThread               = ULONG_MAX;
+    pthread_t miscThread             = ULONG_MAX;
+    pthread_t caDaemonThread         = ULONG_MAX;
+    pthread_t secfileLoadAgentThread = ULONG_MAX;
     if (GetTEEVersion() != 0) {
         tloge("get tee version failed\n");
     }
@@ -232,7 +256,11 @@ int main(void)
     /* sync time to tee should be before ta&driver load to tee for v3.1 signature */
     TrySyncSysTimeToSecure();
 
-    (void)pthread_create(&caDaemonThread, NULL, CaServerWorkThread, &type);
+#ifdef DYNAMIC_CRYPTO_DRV_DIR
+    LoadDynamicCryptoDir();
+#endif
+
+    (void)pthread_create(&caDaemonThread, NULL, CaServerWorkThread, NULL);
 
     SetFileNumLimit();
 
@@ -246,7 +274,16 @@ int main(void)
         (void)pthread_create(&fsThread, NULL, FsWorkThread, g_fsControl);
     }
     (void)pthread_create(&miscThread, NULL, MiscWorkThread, g_miscControl);
+
     (void)pthread_create(&secfileLoadAgentThread, NULL, SecfileLoadAgentThread, g_secLoadAgentControl);
+
+#ifdef DYNAMIC_DRV_DIR
+    LoadDynamicDrvDir();
+#endif
+
+#ifdef DYNAMIC_SRV_DIR
+    LoadDynamicSrvDir();
+#endif
 
     if (g_fsThreadFlag == 1) {
         (void)pthread_join(fsThread, NULL);

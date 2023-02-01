@@ -5,8 +5,8 @@ LIBC_SEC   := libboundscheck
 TARGET_LOG := tlogcat
 TARGET_LIBSEC := libboundscheck.so
 
-LIB_CFLAGS := -DSEC_STORAGE_DATA_KUNPENG_PATH -DSECURITY_AUTH_ENHANCE -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
-LIB_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/teecd/  -Isrc/authentication/
+LIB_CFLAGS := -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
+LIB_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc  -Isrc/authentication/
 LIB_CFLAGS += -lboundscheck -Llibboundscheck/lib -shared
 LIB_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIC -D_FORTIFY_SOURCE=2 -O2
 
@@ -23,7 +23,7 @@ LIB_SOURCES := src/libteec_vendor/tee_client_api.c \
                src/libteec_vendor/tee_client_ext_api.c \
                src/libteec_vendor/tee_client_app_load.c \
                src/libteec_vendor/tee_client_socket.c \
-               src/teecd/secfile_load_agent.c \
+               src/libteec_vendor/tee_load_sec_file.c \
                src/libteec_vendor/tee_session_pool.c
 
 LIB_OBJECTS := $(LIB_SOURCES:.c=.o)
@@ -46,9 +46,10 @@ $(TARGET_LIB):$(TARGET_LIBSEC) $(LIB_SOURCES)
 	@echo "after compile libteec.so"
 
 
-APP_CFLAGS := -DSEC_STORAGE_DATA_KUNPENG_PATH -D_GNU_SOURCE -DSECURITY_AUTH_ENHANCE -DCONFIG_AGENT_FS
-APP_CFLAGS += -DDYNAMIC_DRV_DIR=\"/var/itrustee/tee_dynamic_drv/\" -DDYNAMIC_SRV_DIR=\"/var/itrustee/tee_dynamic_srv/\" -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
-APP_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/teecd/  -Isrc/authentication/
+APP_CFLAGS := -D_GNU_SOURCE -DCONFIG_AGENT_FS
+APP_CFLAGS += -DDYNAMIC_DRV_DIR=\"/var/itrustee/tee_dynamic_drv/\" -DDYNAMIC_CRYPTO_DRV_DIR=\"/var/itrustee/tee_dynamic_drv/crypto/\" \
+              -DDYNAMIC_SRV_DIR=\"/var/itrustee/tee_dynamic_srv/\" -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
+APP_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/teecd/  -Isrc/authentication/ -Isrc/libteec_vendor/
 APP_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
 APP_LDFLAGS += -lboundscheck -Llibboundscheck/lib -lpthread -lcrypto
 
@@ -64,9 +65,10 @@ APP_SOURCES := src/teecd/tee_agent.c \
 			   src/teecd/misc_work_agent.c \
 			   src/teecd/tee_ca_auth.c \
 			   src/teecd/system_ca_auth.c \
-			   src/teecd/tee_load_dynamic.c \
 			   src/authentication/tee_get_native_cert.c \
-			   src/authentication/tee_auth_common.c
+			   src/authentication/tee_auth_common.c \
+			   src/teecd/tee_load_dynamic.c \
+			   src/libteec_vendor/tee_load_sec_file.c
 
 APP_OBJECTS := $(APP_SOURCES:.c=.o)
 
@@ -82,10 +84,9 @@ $(TARGET_APP): $(TARGET_LIBSEC) $(APP_SOURCES)
 #############################
 LOG_SOURCES := src/tlogcat/tarzip.c  \
 	src/tlogcat/sys_syslog_cfg.c \
-        src/tlogcat/proc_tag.c       \
 	src/tlogcat/tlogcat.c
 
-LOG_CFLAGS += -Werror -Wall -Wextra -DTLOGCAT_SYS_LOG
+LOG_CFLAGS += -Werror -Wall -Wextra
 LOG_CFLAGS += -DTEE_LOG_PATH_BASE=\"/var/log\"
 
 LOG_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2

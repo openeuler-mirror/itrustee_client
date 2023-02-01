@@ -9,7 +9,6 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
-
 #ifndef LIBTEEC_FS_WORK_AGENT_H
 #define LIBTEEC_FS_WORK_AGENT_H
 
@@ -19,7 +18,6 @@
 #define FILE_NAME_MAX_BUF       256
 #define FILE_NUM_LIMIT_MAX      1024
 #define KINDS_OF_SSA_MODE       4
-#define AID_SYSTEM 1000
 
 /* static func declare */
 enum FsCmdType {

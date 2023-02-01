@@ -14,15 +14,16 @@
 #include <errno.h>
 #include <sys/prctl.h>
 #include <linux/limits.h>
-#include "tc_ns_client.h"
 #include "securec.h"
+#include "tc_ns_client.h"
+#include "tee_load_sec_file.h"
 
 #define MAX_PATH_LEN 256
 #ifdef LOG_TAG
 #undef LOG_TAG
 #endif
 #define LOG_TAG "teecd_agent"
-#define MAX_BUFFER_LEN (8 * 1024 * 1024)
+#define H_OFFSET 32
 int g_secLoadAgentFd = -1;
 
 int GetSecLoadAgentFd(void)
@@ -33,28 +34,6 @@ int GetSecLoadAgentFd(void)
 void SetSecLoadAgentFd(int secLoadAgentFd)
 {
     g_secLoadAgentFd = secLoadAgentFd;
-}
-
-static int GetImgLen(FILE *fp, long *totalLlen)
-{
-    int ret;
-
-    ret = fseek(fp, 0, SEEK_END);
-    if (ret != 0) {
-        tloge("fseek error\n");
-        return -1;
-    }
-    *totalLlen = ftell(fp);
-    if (*totalLlen <= 0 || *totalLlen > MAX_BUFFER_LEN) {
-        tloge("file is not exist or size is too large, filesize = %ld\n", *totalLlen);
-        return -1;
-    }
-    ret = fseek(fp, 0, SEEK_SET);
-    if (ret != 0) {
-        tloge("fseek error\n");
-        return -1;
-    }
-    return ret;
 }
 
 static int32_t SecFileLoadWork(int tzFd, const char *filePath, enum SecFileType fileType, const TEEC_UUID *uuid)
@@ -71,7 +50,13 @@ static int32_t SecFileLoadWork(int tzFd, const char *filePath, enum SecFileType 
         tloge("realpath open file err=%d, filePath=%s\n", errno, filePath);
         return -1;
     }
-    if (strncmp(realPath, "/vendor/bin", strlen("/vendor/bin")) != 0) {
+    const char* realPathSuffix = strrchr(realPath, '.');
+    if (realPathSuffix == NULL || strnlen(realPathSuffix, PATH_MAX) != strlen(".sec") ||
+        strncmp(realPathSuffix, ".sec", strlen(".sec")) != 0) {
+        tloge("realpath suffix -%s- format is wrong\n", realPathSuffix);
+        return -1;
+    }
+    if (strncmp(realPath, DYNAMIC_TA_PATH, strlen(DYNAMIC_TA_PATH)) != 0) {
         tloge("realpath -%s- is invalid\n", realPath);
         return -1;
     }
@@ -80,76 +65,16 @@ static int32_t SecFileLoadWork(int tzFd, const char *filePath, enum SecFileType 
         tloge("open file err=%d, path=%s\n", errno, filePath);
         return -1;
     }
-    ret = LoadSecFile(tzFd, fp, fileType, uuid);
+    ret = LoadSecFile(tzFd, fp, fileType, uuid, NULL);
     if (fp != NULL) {
         fclose(fp);
     }
     return ret;
 }
 
-// input param uuid may be NULL, so don need to check if uuid is NULL
-int32_t LoadSecFile(int tzFd, FILE *fp, enum SecFileType fileType, const TEEC_UUID *uuid)
-{
-    int32_t ret;
-    char *fileBuffer                   = NULL;
-    struct SecLoadIoctlStruct ioctlArg = { 0, { 0 }, 0, { NULL } };
-
-    if (tzFd < 0 || fp == NULL) {
-        tloge("param erro!\n");
-        return -1;
-    }
-
-    do {
-        long totalLen = 0;
-        ret           = GetImgLen(fp, &totalLen);
-        if (ret != 0) {
-            break;
-        }
-
-        if (totalLen <= 0) {
-            ret = -1;
-            tloge("totalLen is invalid\n");
-            break;
-        }
-        /* alloc a less than 8M heap memory, it needn't slice. */
-        fileBuffer = malloc(totalLen);
-        if (fileBuffer == NULL) {
-            tloge("alloc TA file buffer(size=%ld) failed\n", totalLen);
-            ret = -1;
-            break;
-        }
-
-        /* read total ta file to file buffer */
-        long fileSize = (long)fread(fileBuffer, 1, totalLen, fp);
-        if (fileSize != totalLen) {
-            tloge("read ta file failed, read size/total size=%ld/%ld\n", fileSize, totalLen);
-            ret = -1;
-            break;
-        }
-        ioctlArg.fileType   = fileType;
-        ioctlArg.fileSize   = totalLen;
-        ioctlArg.fileBuffer = fileBuffer;
-        if (uuid != NULL && memcpy_s((void *)(&ioctlArg.uuid), sizeof(ioctlArg.uuid), uuid, sizeof(*uuid)) != EOK) {
-            tloge("memcpy uuid fail\n");
-            ret = -1;
-            break;
-        }
-
-        ret = ioctl(tzFd, (int)TC_NS_CLIENT_IOCTL_LOAD_APP_REQ, &ioctlArg);
-        if (ret != 0) {
-            tloge("ioctl to load sec file failed, ret = 0x%x\n", ret);
-        }
-    } while (false);
-
-    if (fileBuffer != NULL) {
-        free(fileBuffer);
-    }
-    return ret;
-}
-
 static bool IsTaLib(const TEEC_UUID *uuid)
 {
-    char *chr = (char *)uuid;
+    const char *chr = (const char *)uuid;
     uint32_t i;
 
     for (i = 0; i < sizeof(*uuid); i++) {
@@ -179,7 +104,7 @@ static void LoadLib(struct SecAgentControlType *secAgentControl)
         ret =
             snprintf_s(fname, sizeof(fname), MAX_PATH_LEN - 1,
                 "%s/%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x%s.sec",
-                "/vendor/bin", secAgentControl->LibSec.uuid.timeLow, secAgentControl->LibSec.uuid.timeMid,
+                DYNAMIC_TA_PATH, secAgentControl->LibSec.uuid.timeLow, secAgentControl->LibSec.uuid.timeMid,
                 secAgentControl->LibSec.uuid.timeHiAndVersion, secAgentControl->LibSec.uuid.clockSeqAndNode[0],
                 secAgentControl->LibSec.uuid.clockSeqAndNode[1], secAgentControl->LibSec.uuid.clockSeqAndNode[2],
                 secAgentControl->LibSec.uuid.clockSeqAndNode[3], secAgentControl->LibSec.uuid.clockSeqAndNode[4],
@@ -187,7 +112,7 @@ static void LoadLib(struct SecAgentControlType *secAgentControl)
                 secAgentControl->LibSec.uuid.clockSeqAndNode[7], secAgentControl->LibSec.libName);
     } else {
         ret = snprintf_s(fname, sizeof(fname), MAX_PATH_LEN - 1,
-            "%s/%s.sec", "/vendor/bin", secAgentControl->LibSec.libName);
+            "%s/%s.sec", DYNAMIC_TA_PATH, secAgentControl->LibSec.libName);
     }
     if (ret < 0) {
         tloge("pack fname err\n");
@@ -216,7 +141,7 @@ static void LoadTa(struct SecAgentControlType *secAgentControl)
     }
 
     ret = snprintf_s(fname, sizeof(fname), MAX_PATH_LEN - 1, "%s/%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x.sec",
-                     "/vendor/bin", secAgentControl->TaSec.uuid.timeLow, secAgentControl->TaSec.uuid.timeMid,
+                     DYNAMIC_TA_PATH, secAgentControl->TaSec.uuid.timeLow, secAgentControl->TaSec.uuid.timeMid,
                      secAgentControl->TaSec.uuid.timeHiAndVersion, secAgentControl->TaSec.uuid.clockSeqAndNode[0],
                      secAgentControl->TaSec.uuid.clockSeqAndNode[1], secAgentControl->TaSec.uuid.clockSeqAndNode[2],
                      secAgentControl->TaSec.uuid.clockSeqAndNode[3], secAgentControl->TaSec.uuid.clockSeqAndNode[4],
@@ -275,7 +200,7 @@ void *SecfileLoadAgentThread(void *control)
     }
     secAgentControl->magic = SECFILE_LOAD_AGENT_ID;
     while (true) {
-        ret = ioctl(g_secLoadAgentFd, (int)TC_NS_CLIENT_IOCTL_WAIT_EVENT, SECFILE_LOAD_AGENT_ID);
+        ret = ioctl(g_secLoadAgentFd, TC_NS_CLIENT_IOCTL_WAIT_EVENT, SECFILE_LOAD_AGENT_ID);
         if (ret) {
             tloge("gtask agent wait event failed\n");
             break;
@@ -289,9 +214,9 @@ void *SecfileLoadAgentThread(void *control)
 
         __asm__ volatile("isb");
         __asm__ volatile("dsb sy");
-        ret = ioctl(g_secLoadAgentFd, (int)TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, SECFILE_LOAD_AGENT_ID);
+        ret = ioctl(g_secLoadAgentFd, TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, SECFILE_LOAD_AGENT_ID);
         if (ret) {
-            tloge("gtask agent send reponse failed\n");
+            tloge("gtask agent send response failed\n");
             break;
         }
     }

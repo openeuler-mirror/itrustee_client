@@ -10,8 +10,8 @@
  * See the Mulan PSL v2 for more details.
  */
 
-#ifndef SYS_LOG_API_H
-#define SYS_LOG_API_H
+#ifndef WRITE_LOG_API_H
+#define WRITE_LOG_API_H
 
 #include <stdbool.h>
 #include "tlogcat.h"

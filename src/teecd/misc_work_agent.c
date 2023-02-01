@@ -34,8 +34,8 @@ static void GetTimeWork(struct MiscControlType *transControl)
 
     if (gettimeofday(&timeVal, NULL) == 0) {
         transControl->ret                  = 0;
-        transControl->Args.GetTime.seconds = timeVal.tv_sec;
-        transControl->Args.GetTime.millis  = (timeVal.tv_usec / 1000);
+        transControl->Args.GetTime.seconds = (uint32_t)timeVal.tv_sec;
+        transControl->Args.GetTime.millis  = (uint32_t)(timeVal.tv_usec / 1000);
         struct tm *tstruct                 = NULL;
 
         tstruct = localtime(&(timeVal.tv_sec));
@@ -79,7 +79,7 @@ void *MiscWorkThread(void *control)
     transControl->magic = AGENT_MISC_ID;
     while (1) {
         tlogv("++ misc agent loop ++\n");
-        ret = ioctl(miscFd, (int)TC_NS_CLIENT_IOCTL_WAIT_EVENT, AGENT_MISC_ID);
+        ret = ioctl(miscFd, TC_NS_CLIENT_IOCTL_WAIT_EVENT, AGENT_MISC_ID);
         if (ret != 0) {
             tloge("misc agent wait event failed\n");
             break;
@@ -107,9 +107,9 @@ void *MiscWorkThread(void *control)
         __asm__ volatile("isb");
         __asm__ volatile("dsb sy");
 
-        ret = ioctl(miscFd, (int)TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, AGENT_MISC_ID);
+        ret = ioctl(miscFd, TC_NS_CLIENT_IOCTL_SEND_EVENT_RESPONSE, AGENT_MISC_ID);
         if (ret != 0) {
-            tloge("misc agent send reponse failed\n");
+            tloge("misc agent send response failed\n");
             break;
         }
         tlogv("-- misc agent loop --\n");

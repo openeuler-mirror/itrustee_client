@@ -18,12 +18,11 @@
 #include <sys/mman.h>  /* for mmap */
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/select.h>
-#include <sys/time.h>
 #include <pthread.h>
 #include "securec.h"
 #include "tc_ns_client.h"
 #include "tee_client_type.h"
+#include "tee_client_socket.h"
 #include "tee_agent.h"
 #include "tee_log.h"
 #include "tee_auth_common.h"
@@ -43,8 +42,8 @@
 
 static unsigned int g_version = 0;
 
-static int InitMsg(struct msghdr *hmsg, struct iovec *iov, int iovLen,
-                   char *ctrlBuf, int ctrlBufLen)
+static int InitMsg(struct msghdr *hmsg, struct iovec *iov, size_t iovLen,
+                   char *ctrlBuf, size_t ctrlBufLen)
 {
     if (hmsg == NULL || iov == NULL || ctrlBuf == NULL) {
         return EINVAL;
@@ -93,7 +92,7 @@ static int SendFileDescriptor(int cmd, int socket, int fd)
         controlMsg->cmsg_level          = SOL_SOCKET;
         controlMsg->cmsg_type           = SCM_RIGHTS;
         controlMsg->cmsg_len            = CMSG_LEN(sizeof(int));
-        cmdata = (int *)CMSG_DATA(controlMsg);
+        cmdata = (int *)(uintptr_t)CMSG_DATA(controlMsg);
         *cmdata = fd;
     }
 
@@ -148,24 +147,24 @@ static int ProcessCaMsg(const struct ucred *cr, const CaRevMsg *caInfo, int sock
     return 0;
 }
 
-static void ProcessAccept(int s, int daemonType, CaRevMsg *caInfo)
+static void ProcessAccept(int s, CaRevMsg *caInfo)
 {
     struct ucred cr;
     struct sockaddr_un remote;
     int ret;
 
     while (1) {
-        tlogd("Waiting for a connection...target daemon type is : %d \n", daemonType);
+        tlogd("Waiting for a connection...target daemon\n");
         size_t t = sizeof(remote);
         int s2   = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t);
         if (s2 == -1) {
-            tloge("accept() to server socket failed, errno=%d, daemon_type=%d", errno, daemonType);
+            tloge("accept() to server socket failed, errno=%d", errno);
             continue;
         }
 
         socklen_t len = sizeof(struct ucred);
         if (getsockopt(s2, SOL_SOCKET, SO_PEERCRED, &cr, &len) < 0) {
-            tloge("peercred failed: %d, daemon_type: %d\n", errno, daemonType);
+            tloge("peercred failed: %d", errno);
             close(s2);
             continue;
         }
@@ -182,12 +181,12 @@ static void ProcessAccept(int s, int daemonType, CaRevMsg *caInfo)
 
         ret = ProcessCaMsg(&cr, caInfo, s2);
         if (ret != 0) {
-            tloge("Failed to process ca msg. ret=%d, daemon_type=%d\n", ret, daemonType);
+            tloge("Failed to process ca msg. ret=%d\n", ret);
             goto CLOSE_SOCKET;
         }
 
     CLOSE_SOCKET:
-        tlogd("close_socket and curret ret=%u, daemon_type=%d\n", ret, daemonType);
+        tlogd("close_socket and curret ret=%u\n", ret);
         close(s2);
         errno_t rc = memset_s(caInfo, sizeof(CaRevMsg), 0, sizeof(CaRevMsg));
         if (rc != EOK) {
@@ -196,24 +195,16 @@ static void ProcessAccept(int s, int daemonType, CaRevMsg *caInfo)
     }
 }
 
-static int FormatSockAddr(int32_t connectType, struct sockaddr_un *local, socklen_t *len)
+static int FormatSockAddr(struct sockaddr_un *local, socklen_t *len)
 {
-    int ret;
-
-    if (connectType == TEECD_CONNECT) {
-        ret = strncpy_s(local->sun_path, sizeof(local->sun_path), TC_NS_SOCKET_NAME, sizeof(TC_NS_SOCKET_NAME));
-    } else {
-        ret = strncpy_s(local->sun_path, sizeof(local->sun_path), TC_NS_SOCKET_NAME_SYSTEM,
-                        sizeof(TC_NS_SOCKET_NAME_SYSTEM));
-    }
-
+    int ret = strncpy_s(local->sun_path, sizeof(local->sun_path), TC_NS_SOCKET_NAME, sizeof(TC_NS_SOCKET_NAME));
     if (ret != EOK) {
-        tloge("strncpy_s failed! connect type is %d\n", connectType);
+        tloge("strncpy_s failed\n");
         return ret;
     }
 
     local->sun_family = AF_UNIX;
-    *len              = (int)(strlen(local->sun_path) + sizeof(local->sun_family));
+    *len              = (socklen_t)(strlen(local->sun_path) + sizeof(local->sun_family));
     /* Make the socket in the Abstract Domain(no path but everyone can connect) */
     local->sun_path[0] = 0;
 
@@ -223,21 +214,24 @@ static int FormatSockAddr(int32_t connectType, struct sockaddr_un *local, sockle
 int GetTEEVersion(void)
 {
     int ret;
-    int fd = open(TC_NS_CLIENT_DEV_NAME, O_RDWR);
+
+    int fd = open(TC_TEECD_PRIVATE_DEV_NAME, O_RDWR);
     if (fd == -1) {
-        tloge("Failed to open %s: %d\n", TC_NS_CLIENT_DEV_NAME, errno);
+        tloge("Failed to open %s: %d\n", TC_TEECD_PRIVATE_DEV_NAME, errno);
         return -1;
     }
+
     ret = ioctl(fd, TC_NS_CLIENT_IOCTL_GET_TEE_VERSION, &g_version);
     close(fd);
     if (ret != 0) {
         tloge("Failed to get tee version, err=%d\n", ret);
         return -1;
     }
+
     return ret;
 }
 
-static int32_t CreateSocket(int32_t connectType)
+static int32_t CreateSocket(void)
 {
     int32_t ret;
 
@@ -258,9 +252,9 @@ static int32_t CreateSocket(int32_t connectType)
         return -1;
     }
 
-    ret = FormatSockAddr(connectType, &local, &len);
+    ret = FormatSockAddr(&local, &len);
     if (ret != EOK) {
-        tloge("format sock addr failed! connect type is %d\n", connectType);
+        tloge("format sock addr failed\n");
         close(s);
         return -1;
     }
@@ -276,22 +270,12 @@ static int32_t CreateSocket(int32_t connectType)
 
 void *CaServerWorkThread(void *dummy)
 {
-    int32_t connectType;
+    (void)dummy;
+    CaRevMsg *caInfo = NULL;
 
-    if (dummy == NULL) {
-        tloge("dummy is NULL error!\n");
-        goto ONLY_EXIT;
-    }
-
-    connectType  = *(int32_t *)dummy;
-    if (connectType != TEECD_CONNECT) {
-        tloge("connect type error! connect type is %d\n", connectType);
-        goto ONLY_EXIT;
-    }
-
-    int32_t s = CreateSocket(connectType);
+    int32_t s = CreateSocket();
     if (s < 0) {
-        goto ONLY_EXIT;
+        return NULL;
     }
 
     /* Start listening on the socket */
@@ -300,28 +284,26 @@ void *CaServerWorkThread(void *dummy)
         goto CLOSE_EXIT;
     }
 
-    tlogv("\n********* deamon=%d successfully initialized!***\n", connectType);
+    tlogv("\n********* deamon successfully initialized!***\n");
 
-    CaRevMsg *caInfo = (CaRevMsg *)malloc(sizeof(CaRevMsg));
+    caInfo = (CaRevMsg *)malloc(sizeof(CaRevMsg));
     if (caInfo == NULL) {
         tloge("ca server: Failed to malloc caInfo\n");
         goto CLOSE_EXIT;
     }
 
-    errno_t rc = memset_s(caInfo, sizeof(CaRevMsg), 0, sizeof(CaRevMsg));
-    if (rc != EOK) {
+    if (memset_s(caInfo, sizeof(CaRevMsg), 0, sizeof(CaRevMsg)) != EOK) {
         tloge("ca_info memset_s failed\n");
         free(caInfo);
         goto CLOSE_EXIT;
     }
 
-    ProcessAccept(s, connectType, caInfo);
+    ProcessAccept(s, caInfo);
     free(caInfo);
 
-    tlogv("\n********* deamon=%d process_accept over!***\n", connectType);
+    tlogv("\n********* deamon process_accept over!***\n");
 
 CLOSE_EXIT:
     close(s);
-ONLY_EXIT:
     return NULL;
 }
