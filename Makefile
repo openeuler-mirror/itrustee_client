@@ -7,8 +7,8 @@ TARGET_LIBSEC := libboundscheck.so
 
 LIB_CFLAGS := -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
 LIB_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc  -Isrc/authentication/
-LIB_CFLAGS += -lboundscheck -Llibboundscheck/lib -shared
 LIB_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIC -D_FORTIFY_SOURCE=2 -O2
+LIB_LDFLAGS := -lboundscheck -Llibboundscheck/lib -shared
 
 ifeq ($(TOOL_CHAIN),1)
 	CC := aarch64-linux-gnu-gcc
@@ -39,7 +39,7 @@ $(TARGET_LIBSEC):
 
 $(TARGET_LIB):$(TARGET_LIBSEC) $(LIB_SOURCES)
 	@echo "compile libteec.so"
-	@$(CC) $(LIB_CFLAGS) $(LIB_CFLAGS) -o $@ $(LIB_SOURCES)
+	@$(CC) $(LIB_CFLAGS) -o $@ $(LIB_SOURCES) $(LIB_LDFLAGS)
 	@mkdir -p $(TARGET_DIR)
 	@mv libteec.so $(TARGET_DIR)
 	@cp $(LIBC_SEC)/lib/libboundscheck.so $(TARGET_DIR)
