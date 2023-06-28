@@ -92,10 +92,10 @@ static void LoadOneDynamicDir(int32_t fd, const char *dynDir, uint32_t loadType)
         return;
     }
     while ((dirFile = readdir(dir)) != NULL) {
-		if (dirFile->d_type != DT_REG) {
-			tlogd("no need to load\n");
-			continue;
-		}
+        if (dirFile->d_type != DT_REG) {
+            tlogd("no need to load\n");
+            continue;
+        }
         ret = LoadOneFile(dynDir, dirFile, fd, loadType);
         if (ret != 0) {
             tlogd("load dynamic failed\n");

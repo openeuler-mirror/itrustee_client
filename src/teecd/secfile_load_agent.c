@@ -63,13 +63,38 @@ void SecLoadAgentThreadJoin(void)
 	(void)pthread_join(g_secLoadThread, NULL);
 }
 
+void *GetSecLoadAgentControl(void)
+{
+    return g_secLoadAgentControl;
+}
+
+int SecLoadAgentInit(void)
+{
+    g_secLoadAgentFd = AgentInit(SECFILE_LOAD_AGENT_ID, (void **)(&g_secLoadAgentControl));
+    if (g_secLoadAgentFd < 0) {
+        tloge("secfile load agent init failed\n");
+        return -1;
+    }
+    return 0;
+}
+
+void SecLoadAgentThreadCreate(void)
+{
+    (void)pthread_create(&g_secLoadThread, NULL, SecfileLoadAgentThread, g_secLoadAgentControl);
+}
+
+void SecLoadAgentThreadJoin(void)
+{
+    (void)pthread_join(g_secLoadThread, NULL);
+}
+
 void SecLoadAgentExit(void)
 {
-	if (g_secLoadAgentFd >= 0) {
-		AgentExit(SECFILE_LOAD_AGENT_ID, g_secLoadAgentFd);
-		g_secLoadAgentFd = -1;
-		g_secLoadAgentControl = NULL;
-	}
+    if (g_secLoadAgentFd >= 0) {
+        AgentExit(SECFILE_LOAD_AGENT_ID, g_secLoadAgentFd);
+        g_secLoadAgentFd = -1;
+        g_secLoadAgentControl = NULL;
+    }
 }
 
 static int32_t SecFileLoadWork(int tzFd, const char *filePath, enum SecFileType fileType, const TEEC_UUID *uuid)

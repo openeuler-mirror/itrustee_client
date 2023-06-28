@@ -18,30 +18,30 @@
 #ifdef LOG_TEEOS_TAG
 #undef LOG_TEEOS_TAG
 #endif
-#define LOG_TEEOS_TAG      "teeos"
+#define LOG_TEEOS_TAG               "teeos"
 
-#define TC_LOGGER_DEV_NAME "/dev/teelog"
+#define TC_LOGGER_DEV_NAME          "/dev/teelog"
 
-#define LOG_ITEM_MAX_LEN   1024
+#define LOG_ITEM_MAX_LEN            1024
 
-#define LEVEL_ERROR        0
-#define LEVEL_WARNING      1
-#define LEVEL_INFO         2
-#define LEVEL_DEBUG        3
-#define LEVEL_VERBO        4
+#define LEVEL_ERROR                 0
+#define LEVEL_WARNING               1
+#define LEVEL_INFO                  2
+#define LEVEL_DEBUG                 3
+#define LEVEL_VERBO                 4
 
-#define TOTAL_LEVEL_NUMS   6
+#define TOTAL_LEVEL_NUMS            6
 
-#define LOG_FILE_INDEX_MAX 4U
+#define LOG_FILE_INDEX_MAX          4U
 
-#define NEVER_USED_LEN     28U
-#define TEE_UUID_LEN       16U
-#define ITEM_RESERVED_LEN  1U
+#define NEVER_USED_LEN              28U
+#define TEE_UUID_LEN                16U
+#define ITEM_RESERVED_LEN           1U
 
 /* 64 byte head + user log */
 struct LogItem {
     uint8_t neverUsed[NEVER_USED_LEN];
-	uint32_t nsid;
+    uint32_t nsid;
     uint16_t magic;
     uint16_t reserved0;
     uint32_t serialNo;

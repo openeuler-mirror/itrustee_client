@@ -21,7 +21,7 @@ static char g_logItemBuffer[LOG_ITEM_MAX_LEN];
 void OpenTeeLog(void)
 {
 #ifdef DISABLE_LOG_CONS
-	openlog(LOG_TEEOS_TAG, LOG_NDELAY, LOG_USER);
+    openlog(LOG_TEEOS_TAG, LOG_NDELAY, LOG_USER);
 #else
     openlog(LOG_TEEOS_TAG, LOG_CONS | LOG_NDELAY, LOG_USER);
 #endif
@@ -54,6 +54,6 @@ void LogWriteSysLog(const struct LogItem *logItem, bool isTa)
     }
     if (memcpy_s(g_logItemBuffer, LOG_ITEM_MAX_LEN, logItem->logBuffer, logItem->logRealLen) == EOK) {
         g_logItemBuffer[logItem->logRealLen - 1] = '\0';
-        TeeSyslogPrint(logItem, (const char *)g_logItemBuffer);
+        TeeSyslogPrint(logItem, (const char*)g_logItemBuffer);
     }
 }

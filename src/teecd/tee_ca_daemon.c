@@ -50,9 +50,9 @@
 #define IOV_LEN 1
 
 static struct ModuleInfo g_teecdModuleInfo = {
-	.deviceName = TC_TEECD_PRIVATE_DEV_NAME,
-	.moduleName = "teecd",
-	.ioctlNum = TC_NS_CLIENT_IOCTL_GET_TEE_INFO,
+    .deviceName = TC_TEECD_PRIVATE_DEV_NAME,
+    .moduleName = "teecd",
+    .ioctlNum = TC_NS_CLIENT_IOCTL_GET_TEE_INFO,
 };
 static unsigned int g_version = 0;
 
@@ -110,12 +110,12 @@ static int SendFileDescriptor(int cmd, int socket, int fd)
     }
 
     if (cmd == GET_TEEVERSION) {
-		base.teeMaxApiLevel    = fd;
-		hmsg.msg_control       = NULL;
-		hmsg.msg_controllen    = 0;
-	} else if (cmd == GET_TEECD_VERSION) {
-		base.majorVersion      = TEEC_CLIENT_VERSION_MAJOR_SELF;
-		base.minorVersion      = TEEC_CLIENT_VERSION_MINOR_SELF;
+        base.teeMaxApiLevel    = fd;
+        hmsg.msg_control       = NULL;
+        hmsg.msg_controllen    = 0;
+    } else if (cmd == GET_TEECD_VERSION) {
+        base.majorVersion      = TEEC_CLIENT_VERSION_MAJOR_SELF;
+        base.minorVersion      = TEEC_CLIENT_VERSION_MINOR_SELF;
         hmsg.msg_control       = NULL;
         hmsg.msg_controllen    = 0;
     }
@@ -171,7 +171,7 @@ static void ProcessAccept(int s, CaRevMsg *caInfo)
     int ret;
 
     while (1) {
-		/* int done, n; */
+        /* int done, n; */
         tlogd("Waiting for a connection...target daemon\n");
         size_t t = sizeof(remote);
         int s2   = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t);
@@ -225,7 +225,7 @@ static int FormatSockAddr(struct sockaddr_un *local, socklen_t *len)
     *len              = (socklen_t)(strlen(local->sun_path) + sizeof(local->sun_family));
 
 #ifndef CONFIG_PATH_NAMED_SOCKET
-	/* Make the socket in the Abstract Domain(no path but everyone can connect) */
+    /* Make the socket in the Abstract Domain(no path but everyone can connect) */
     local->sun_path[0] = 0;
 #endif
 
@@ -254,41 +254,41 @@ int GetTEEVersion(void)
 
 int TeecdCheckTzdriverVersion(void)
 {
-	InitModuleInfo(&g_teecdModuleInfo);
-	return CheckTzdriverVersion();
+    InitModuleInfo(&g_teecdModuleInfo);
+    return CheckTzdriverVersion();
 }
 
 #ifdef CONFIG_PATH_NAMED_SOCKET
 static int PrepareSocketEnv(void)
 {
-	/* Create socket folder when it no exists */
-	int ret;
+    /* Create socket folder when it no exists */
+    int ret;
 
-	char *sockFilePath = strdup(TC_NS_SOCKET_NAME);
-	if (sockFilePath == NULL) {
-		tloge("failed to get socket file path\n");
-		return -1;
-	}
+    char *sockFilePath = strdup(TC_NS_SOCKET_NAME);
+    if (sockFilePath == NULL) {
+        tloge("failed to get socket file path\n");
+        return -1;
+    }
 
-	char *folder = dirname(sockFilePath);
-	ret = MkdirIteration(folder);
-	if (ret != 0) {
-		tloge("failed to create socket folder\n");
-		free(sockFilePath);
-		return -1;
-	}
+    char *folder = dirname(sockFilePath);
+    ret = MkdirIteration(folder);
+    if (ret != 0) {
+        tloge("failed to create socket folder\n");
+        free(sockFilePath);
+        return -1;
+    }
 
-	/* Unlink socket path when it exists */
-	if (access(TC_NS_SOCKET_NAME, F_OK) == 0) {
-		ret = unlink(TC_NS_SOCKET_NAME);
-		if (ret != 0) {
-			tloge("failed to unlink socket file\n");
-			free(sockFilePath);
-			return -1;
-		}
-	}
-	free(sockFilePath);
-	return 0;
+    /* Unlink socket path when it exists */
+    if (access(TC_NS_SOCKET_NAME, F_OK) == 0) {
+        ret = unlink(TC_NS_SOCKET_NAME);
+        if (ret != 0) {
+            tloge("failed to unlink socket file\n");
+            free(sockFilePath);
+            return -1;
+        }
+    }
+    free(sockFilePath);
+    return 0;
 }
 #endif
 
@@ -314,6 +314,14 @@ static int32_t CreateSocket(void)
     }
 
 #ifdef CONFIG_PATH_NAMED_SOCKET
+    if (PrepareSocketEnv() != 0) {
+        tloge("prepare socket environment failed\n");
+        (void)close(s);
+        return -1;
+    }
+#endif
+
+#ifdef CONFIG_PATH_NAMED_SOCKET
 	if (PrepareSocketEnv() != 0) {
 		tloge("prepare socket environment failed\n");
 		(void)close(s);
@@ -335,14 +343,14 @@ static int32_t CreateSocket(void)
     }
 
 #ifdef CONFIG_PATH_NAMED_SOCKET
-	/* Change socket path permission to srw-rw-rw- */
-	ret = chmod(TC_NS_SOCKET_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-	if(ret < 0) {
-		tloge("change socket permission failed, errno=%d\n", errno);
-		(void)close(s);
-		(void)unlink(TC_NS_SOCKET_NAME);
-		return -1
-	}
+    /* Change socket path permission to srw-rw-rw- */
+    ret = chmod(TC_NS_SOCKET_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    if(ret < 0) {
+        tloge("change socket permission failed, errno=%d\n", errno);
+        (void)close(s);
+        (void)unlink(TC_NS_SOCKET_NAME);
+        return -1;
+    }
 #endif
 
     return s;
@@ -386,9 +394,9 @@ void *CaServerWorkThread(void *dummy)
 CLOSE_EXIT:
     (void)close(s);
 #ifdef CONFIG_PATH_NAMED_SOCKET
-	if (access(TC_NS_SOCKET_NAME, F_OK) == 0) {
-		(void)unlink(TC_NS_SOCKET_NAME);
-	}
+    if (access(TC_NS_SOCKET_NAME, F_OK) == 0) {
+        (void)unlink(TC_NS_SOCKET_NAME);
+    }
 #endif
     return NULL;
 }

@@ -34,7 +34,7 @@ enum ConnectCmd {
     GET_FD,
     GET_TEEVERSION,
     SET_SYS_XML,
-	GET_TEECD_VERSION,
+    GET_TEECD_VERSION,
 };
 
 typedef struct {
@@ -90,9 +90,9 @@ typedef struct {
 } TC_NS_Time;
 
 typedef struct {
-	uint16_t tzdriver_version_major;
-	uint16_t tzdriver_version_minor;
-	uint32_t reserved[15];
+    uint16_t tzdriver_version_major;
+    uint16_t tzdriver_version_minor;
+    uint32_t reserved[15];
 } TC_NS_TEE_Info;
 
 enum SecFileType {

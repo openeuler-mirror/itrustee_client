@@ -40,7 +40,7 @@ int AgentInit(unsigned int id, void **control)
         return -1;
     }
 #ifdef CONFIG_AGENTD
-	int fd = open(TC_NS_CVM_DEV_NAME, O_RDWR);
+    int fd = open(TC_NS_CVM_DEV_NAME, O_RDWR);
 #else
     int fd = open(TC_TEECD_PRIVATE_DEV_NAME, O_RDWR);
 #endif
@@ -81,79 +81,79 @@ void AgentExit(unsigned int id, int fd)
 }
 
 struct AgentOps {
-	int id;
-	int (*agentInit)(void);
-	void (*agentThreadCreate)(void);
-	void (*agentThreadJoin)(void);
-	void (*agentFini)(void);
+    int id;
+    int (*agentInit)(void);
+    void (*agentThreadCreate)(void);
+    void (*agentThreadJoin)(void);
+    void (*agentFini)(void);
 };
 
 static struct AgentOps g_agentOps[] = {
 #ifdef CONFIG_AGENT_FS
-	{AGENT_FS_ID, FsAgentInit, FsAgentThreadCreate, FsAgentThreadJoin, FsAgentExit},
+    {AGENT_FS_ID, FsAgentInit, FsAgentThreadCreate, FsAgentThreadJoin, FsAgentExit},
 #endif
 #ifdef CONFIG_AGENT_MISC
-	{AGENT_MISC_ID, MiscAgentInit, MiscAgentThreadCreate, MiscAgentThreadJoin, MiscAgentExit},
+    {AGENT_MISC_ID, MiscAgentInit, MiscAgentThreadCreate, MiscAgentThreadJoin, MiscAgentExit},
 #endif
 #ifdef CONFIG_AGENT_SECLOAD
-	{SECFILE_LOAD_AGENT_ID, SecLoadAgentInit, SecLoadAgentThreadCreate, SecLoadAgentThreadJoin, SecLoadAgentExit},
+    {SECFILE_LOAD_AGENT_ID, SecLoadAgentInit, SecLoadAgentThreadCreate, SecLoadAgentThreadJoin, SecLoadAgentExit},
 #endif
 };
 static int g_agentNum = sizeof(g_agentOps) / sizeof(struct AgentOps);
 
 int ProcessAgentInit(void)
 {
-	int index;
-	int index2;
-	for (index = 0; index < g_agentNum; index++) {
-		if (g_agentOps[index].agentInit != NULL) {
-			if (g_agentOps[index].agentInit() != 0) {
-				break;
-			}
-		}
-	}
+    int index;
+    int index2;
+    for (index = 0; index < g_agentNum; index++) {
+        if (g_agentOps[index].agentInit != NULL) {
+            if (g_agentOps[index].agentInit() != 0) {
+                break;
+            }
+        }
+    }
 
-	if (index == g_agentNum) {
-		return 0;
-	}
+    if (index == g_agentNum) {
+        return 0;
+    }
 
-	/* not all agent is init success */
-	for (index2 = 0; index2 < index; index2++) {
-		if (g_agentOps[index2].agentFini != NULL) {
-			g_agentOps[index2].agentFini();
-		}
-	}
-	return -1;
+    /* not all agent is init success */
+    for (index2 = 0; index2 < index; index2++) {
+        if (g_agentOps[index2].agentFini != NULL) {
+            g_agentOps[index2].agentFini();
+        }
+    }
+    return -1;
 }
 
 void ProcessAgentThreadCreate(void)
 {
-	int index;
-	for (index = 0; index < g_agentNum; index++) {
-		if (g_agentOps[index].agentThreadCreate != NULL) {
-			g_agentOps[index].agentThreadCreate();
-		}
-	}
+    int index;
+    for (index = 0; index < g_agentNum; index++) {
+        if (g_agentOps[index].agentThreadCreate != NULL) {
+            g_agentOps[index].agentThreadCreate();
+        }
+    }
 }
 
 void ProcessAgentThreadJoin(void)
 {
-	int index;
-	for (index = 0; index < g_agentNum; index++) {
-		if (g_agentOps[index].agentThreadJoin != NULL) {
-			g_agentOps[index].agentThreadJoin();
-		}
-	}
+    int index;
+    for (index = 0; index < g_agentNum; index++) {
+        if (g_agentOps[index].agentThreadJoin != NULL) {
+            g_agentOps[index].agentThreadJoin();
+        }
+    }
 }
 
 void ProcessAgentExit(void)
 {
-	int index;
-	for (index = 0; index < g_agentNum; index++) {
-		if (g_agentOps[index].agentFini != NULL) {
-			g_agentOps[index].agentFini();
-		}
-	}
+    int index;
+    for (index = 0; index < g_agentNum; index++) {
+        if (g_agentOps[index].agentFini != NULL) {
+            g_agentOps[index].agentFini();
+        }
+    }
 }
 
 #define SEC_MIN 0xFFFFF

@@ -33,7 +33,7 @@
 #define IOV_LEN 1
 
 static bool g_firstConnectTeecd = true;
-static int g_teeVersionCheckResult = -1;
+static int g_teecVersionCheckResult = -1;
 
 static int ConnectTeecdSocket(int *socketFd)
 {
@@ -68,6 +68,7 @@ static int ConnectTeecdSocket(int *socketFd)
     }
 
     len = (uint32_t)(strlen(remote.sun_path) + sizeof(remote.sun_family));
+
 #ifndef CONFIG_PATH_NAMED_SOCKET
     remote.sun_path[0] = 0;
 #endif
@@ -105,20 +106,24 @@ static int InitRecvMsg(struct msghdr *recvMsg, struct iovec *iov, size_t iovLen,
 
 static int CheckTeecdVersion(const RecvTeecdMsg *msg)
 {
-	const uint16_t teecMajorVersion = TEEC_CLIENT_VERSION_MAJOR_SELF;
-	const uint16_t teecMinorVersion = TEEC_CLIENT_VERSION_MINOR_SELF;
+    const uint16_t teecMajorVersion = TEEC_CLIENT_VERSION_MAJOR_SELF;
+    const uint16_t teecMinorVersion = TEEC_CLIENT_VERSION_MINOR_SELF;
 
-	if (msg->majorVersion != teecMajorVersion) {
-		tloge("check major verison failed, libteec major version %u, teecd major version %u\n",
-			teecMajorVersion, msg->majorVersion);
-		return -1;
-	}
+    if (msg->majorVersion != teecMajorVersion) {
+        tloge("check major version failed, libteec major version %u, teecd major version %u\n",
+            teecMajorVersion, msg->majorVersion);
+        return -1;
+    }
 
-	if (teecMinorVersion > msg->minorVersion) {
-		tloge("check minor version failed, libteec version %u.%u\n",
-			teecMajorVersion, teecMinorVersion, msg->majorVersion, msg->minorVersion);
-	}
-	return 0;
+    if (teecMinorVersion > msg->minorVersion) {
+        tloge("check minor version failed, libteec version %u.%u, teecd version %u.%u\n",
+            teecMajorVersion, teecMinorVersion, msg->majorVersion, msg->minorVersion);
+        return -1;
+    } else if (teecMinorVersion < msg->minorVersion) {
+        tlogi("current libteec version %u.%u, teecd version %u.%u\n",
+            teecMajorVersion, teecMinorVersion, msg->majorVersion, msg->minorVersion);
+    }
+    return 0;
 }
 
 /* Socket from which the file descriptor is read */
@@ -128,7 +133,7 @@ static int RecvSockMsg(int cmd, int socketFd)
     struct iovec iov[IOV_LEN];
     struct cmsghdr *controlMsg = NULL;
     char ctrlBuf[CMSG_SPACE(sizeof(int))];
-	RecvTeecdMsg data = { 0 };
+    RecvTeecdMsg data = { 0 };
     ssize_t res;
     errno_t rc;
     int *cmdata = NULL;
@@ -154,16 +159,16 @@ static int RecvSockMsg(int cmd, int socketFd)
     if (cmd == GET_TEEVERSION || cmd == GET_TEECD_VERSION) {
         hmsg.msg_control    = NULL;
         hmsg.msg_controllen = 0;
-        res                    = recvmsg(socketFd, &hmsg, 0);
+        res                 = recvmsg(socketFd, &hmsg, 0);
         if (res <= 0) {
             return -1;
         }
-		if (cmd == GET_TEEVERSION) {
-			return data.teeMaxApiLevel;
-		} else {
-			g_teecVersionCheckResult = CheckTeecdVersion(&data);
-			return 0;
-		}
+        if (cmd == GET_TEEVERSION) {
+            return data.teeMaxApiLevel;
+        } else {
+            g_teecVersionCheckResult = CheckTeecdVersion(&data);
+            return 0;
+        }
     }
 
     res = recvmsg(socketFd, &hmsg, 0);
@@ -239,19 +244,18 @@ static void SleepNs(long num)
     }
 }
 
-
 /* sleep 200 ms, and 50 times */
 #define SLEEP_TIME (200 * 1000 * 1000)
 #define SLEEP_COUNT 50
 static int CaDaemonConnect(const CaAuthInfo *caInfo, int cmd, const TEEC_XmlParameter *halXmlPtr)
 {
     int s = -1;
-	int32_t failCount = 0; /* allow fail 50 times */
-	int32_t cRet;
+    int32_t failCount = 0; /* allow fail 50 times */
+    int32_t cRet;
     struct msghdr message;
     struct iovec iov[1];
     CaRevMsg *revMsg = NULL;
-	int32_t msgRet = -1;
+    int32_t msgRet = -1;
 
     /* add retry to avoid app start before daemon */
     while (failCount++ < SLEEP_COUNT) {
@@ -292,34 +296,34 @@ static int CaDaemonConnect(const CaAuthInfo *caInfo, int cmd, const TEEC_XmlPara
 
     msgRet = RecvSockMsg(cmd, s);
 
-	close(s);
+    close(s);
     free(revMsg);
     return msgRet;
 }
 
 int CaDaemonConnectWithCaInfo(const CaAuthInfo *caInfo, int cmd, const TEEC_XmlParameter *halXmlPtr)
 {
-	if (caInfo == NULL) {
-		tloge("ca daemon: ca auth info is NULL\n");
-		return -1;
-	}
+    if (caInfo == NULL) {
+        tloge("ca daemon: ca auth info is NULL\n");
+        return -1;
+    }
 
-	if (g_firstConnectTeecd) {
-		if (CaDaemonConnect(caInfo, GET_TEECD_VERSION, halXmlPtr) != 0) {
-			tloge("get teecd version failed\n");
-			return -1;
-		}
-		g_firstConnectTeecd = false;
-	}
+    if (g_firstConnectTeecd) {
+        if (CaDaemonConnect(caInfo, GET_TEECD_VERSION, halXmlPtr) != 0) {
+            tloge("get teecd version failed\n");
+            return -1;
+        }
+        g_firstConnectTeecd = false;
+    }
 
-	if (g_teecVersionCheckResult != 0) {
-		tloge("check teecd version failed\n");
-		return -1;
-	}
+    if (g_teecVersionCheckResult != 0) {
+        tloge("check teecd version failed\n");
+        return -1;
+    }
 
-	int fd = CaDaemonConnect(caInfo, cmd, halXmlPtr);
-	if (cmd == GET_FD && fd >= 0) {
-		tlogd("Fd received!\n");
-	}
-	return fd;
+    int fd = CaDaemonConnect(caInfo, cmd, halXmlPtr);
+    if (cmd == GET_FD && fd >= 0) {
+        tlogd("Fd received!\n");
+    }
+    return fd;
 }

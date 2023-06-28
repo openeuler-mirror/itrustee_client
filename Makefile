@@ -10,6 +10,7 @@ WITH_CONFIDENTIAL_CONTAINER ?= true
 COMMON_CFLAGS :=
 ifeq ($(WITH_CONFIDENTIAL_CONTAINER), true)
 	COMMON_CFLAGS += -DCONFIG_PATH_NAMED_SOCKET=\"/var/itrustee/teecd/teecd.sock\"
+endif
 
 ifeq ($(TOOL_CHAIN),1)
 	CC := aarch64-linux-gnu-gcc
@@ -27,7 +28,7 @@ install:
 	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_APP) /usr/bin
 	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_LOG) /usr/bin
 	[ ! -d "/usr/lib64" ] && mkdir -p /usr/lib64 || true
-	cp -f $(TARGET_DIR)/$(TARGET_LIB) /usr/lib64 # only for secgear
+	cp -f $(TARGET_DIR)/$(TARGET_LIB) /usr/lib64  # only for secgear
 	[ -d "/lib64" ] && cp -f $(TARGET_DIR)/$(TARGET_LIB) /lib64
 	[ -d "/lib64" ] && cp -f $(TARGET_DIR)/$(TARGET_LIBSEC) /lib64
 
@@ -46,7 +47,7 @@ install-container:
 		echo "Not found ld library path"; \
 	fi
 
-LIB_CFLAGS := $(COMMON_CFLAGS) -DSEC_STORAGE_DATA_KUNPENG_PATH -DCONFIG_KUNPENG_PLATFORM -DCONFIG_AUTH_USERNAME -DDYNAMIC_TA_PATH=\"/var/itrustee/ta\"
+LIB_CFLAGS := $(COMMON_CFLAGS) -DSEC_STORAGE_DATA_KUNPENG_PATH -DCONFIG_KUNPENG_PLATFORM -DCONFIG_AUTH_USERNAME -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
 LIB_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/authentication/
 LIB_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIC -D_FORTIFY_SOURCE=2 -O2
 LIB_LDFLAGS := -lboundscheck -Llibboundscheck/lib -shared
@@ -73,7 +74,6 @@ $(TARGET_LIB):$(TARGET_LIBSEC) $(LIB_SOURCES)
 	@mv libteec.so $(TARGET_DIR)
 	@cp $(LIBC_SEC)/lib/libboundscheck.so $(TARGET_DIR)
 	@echo "after compile libteec.so"
-
 
 APP_CFLAGS := $(COMMON_CFLAGS) -DSEC_STORAGE_DATA_KUNPENG_PATH -D_GNU_SOURCE
 APP_CFLAGS += -DCONFIG_KUNPENG_PLATFORM -DCONFIG_AUTH_USERNAME -DCONFIG_AGENT_FS -DCONFIG_AGENT_MISC -DCONFIG_AGENT_SECLOAD
@@ -133,7 +133,7 @@ AGENTD_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/includ
 AGENTD_CFLAGS += -Isrc/authentication/ -Isrc/libteec_vendor/ -Isrc/common
 AGENTD_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
 AGENTD_LDFLAGS += $(LD_FLAGS) -lboundscheck -Llibboundscheck/lib -lpthread -lcrypto
-ifneq($(strip $(CFG_ENG)), user)
+ifneq ($(strip $(CFG_ENG)), user)
 AGENTD_CFLAGS += -DDEF_ENG
 endif
 
@@ -150,7 +150,7 @@ $(TARGET_AGENTD): $(AGENTD_SOURCES)
 ## tlogcat
 #############################
 LOG_SOURCES := src/tlogcat/tarzip.c  \
-	src/tlogcat/sys_syslog_cfg.c \
+	src/tlogcat/sys_syslog_cfg.c  \
 	src/tlogcat/tlogcat.c \
 	src/common/tee_version_check.c
 

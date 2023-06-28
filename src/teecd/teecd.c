@@ -36,20 +36,20 @@
 
 static int TeecdInit(void)
 {
-	if (GetTEEVersion != 0) {
-		tloge("get tee version failed\n");
-	}
+    if (GetTEEVersion() != 0) {
+        tloge("get tee version failed\n");
+    }
 
-	if (TeecdCheckTzdriverVersion() != 0) {
-		tloge("check tee client & tee driver version failed\n");
-		return -1;
-	}
+    if (TeecdCheckTzdriverVersion() != 0) {
+        tloge("check tee client & tee driver version failed\n");
+        return -1;
+    }
 
 #if defined(CONFIG_HIDL) || defined(CONFIG_CMS_CAHASH_AUTH) || defined(CONFIG_ARMPC_PLATFORM)
-	/* Trans the xml file to tzdriver: */
-	TcuAuthentication();
+    /* Trans the xml file to tzdriver: */
+    TcuAuthentication();
 #endif
-	return 0;
+    return 0;
 }
 
 #ifdef CONFIG_LIBTEECD_SHARED
@@ -58,45 +58,45 @@ int teecd_main(void)
 int main(void)
 #endif
 {
-	pthread_t caDaemonThread	= ULONG_MAX;
+    pthread_t caDaemonThread         = ULONG_MAX;
 
-	if (TeecdInit() != 0) {
-		return -1;
-	}
+    if (TeecdInit() != 0) {
+        return -1;
+    }
 
-	int ret = ProcessAgentInit();
-	if (ret != 0) {
-		return ret;
-	}
+    int ret = ProcessAgentInit();
+    if (ret != 0) {
+        return ret;
+    }
 
-	/* sync time to tee should be before ta&driver load to tee for v3.1 signature */
-	TrySyncSysTimeToSecure();
+    /* sync time to tee should be before ta&driver load to tee for v3.1 signature */
+    TrySyncSysTimeToSecure();
 
-#ifdef DYNAMIC_CRYPTO_DEV_DIR
-	LoadDynamicCryptoDir();
+#ifdef DYNAMIC_CRYPTO_DRV_DIR
+    LoadDynamicCryptoDir();
 #endif
 
-	(void)pthread_create(&caDaemonThread, NULL, CaServerWorkThread, NULL);
+    (void)pthread_create(&caDaemonThread, NULL, CaServerWorkThread, NULL);
 
-	/*
-	 * register our signal handle, catch signal which default action is exit
-	 */
-	/* ignore SIGPIPE(happened when CA created socket then be killed),teecd will not restart. */
-	(void)signal(SIGPIPE, SIG_IGN);
+    /*
+     * register our signal handle, catch signal which default action is exit
+     */
+    /* ignore SIGPIPE(happened when CA created socket then be killed),teecd will not restart. */
+    (void)signal(SIGPIPE, SIG_IGN);
 
-	ProcessAgentThreadCreate();
+    ProcessAgentThreadCreate();
 
 #ifdef DYNAMIC_DRV_DIR
-	LoadDynamicDrvDir();
+    LoadDynamicDrvDir();
 #endif
 
 #ifdef DYNAMIC_SRV_DIR
-	LoadDynamicSrvDir();
+    LoadDynamicSrvDir();
 #endif
 
-	(void)pthread_join(caDaemonThread, NULL);
-	ProcessAgentThreadJoin();
+    (void)pthread_join(caDaemonThread, NULL);
+    ProcessAgentThreadJoin();
 
-	PorcessAgentExit();
-	return 0;
+    ProcessAgentExit();
+    return 0;
 }

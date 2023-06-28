@@ -95,13 +95,13 @@ static int ParseUserName(unsigned int caUid, const char *userName, int nameBufLe
 int TeeGetUserName(int caPid, unsigned int caUid, char *userName, size_t nameBufLen)
 {
     int i;
-	char path[MAX_PATH_LENGTH] = { 0 };
+    char path[MAX_PATH_LENGTH] = { 0 };
 
-	int ret = snprintf_s(path, sizeof(path), sizeof(path) - 1, "/proc/%d/root/etc/passwd", caPid);
-	if (ret == -1) {
-		tloge("get passwd filename failed\n");
-		return -1;
-	}
+    int ret = snprintf_s(path, sizeof(path), sizeof(path) - 1, "/proc/%d/root/etc/passwd", caPid);
+    if (ret == -1) {
+        tloge("get passwd filename failed\n");
+        return -1;
+    }
 
     FILE *fd = fopen(path, "r");
     if (fd == NULL) {

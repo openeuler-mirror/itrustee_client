@@ -48,42 +48,42 @@ static pthread_t g_fsThread = ULONG_MAX;
 
 int GetFsAgentFd(void)
 {
-	return g_fsAgentFd;
+    return g_fsAgentFd;
 }
 
 void *GetFsAgentControl(void)
 {
-	return g_fsAgentControl;
+    return g_fsAgentControl;
 }
 
 int FsAgentInit(void)
 {
-	g_fsAgentFd = AgentInit(AGENT_FS_ID, (void **)(&g_fsAgentControl));
-	if (g_fsAgentFd < 0) {
-		tloge("fs agent init failed\n");
-		return -1;
-	}
-	return 0;
+    g_fsAgentFd = AgentInit(AGENT_FS_ID, (void **)(&g_fsAgentControl));
+    if (g_fsAgentFd < 0) {
+        tloge("fs agent init failed\n");
+        return -1;
+    }
+    return 0;
 }
 
 void FsAgentThreadCreate(void)
 {
-	SetFileNumLimit();
-	(void)pthread_create(&g_fsThread, NULL, FsWorkThread, g_fsAgentControl);
+    SetFileNumLimit();
+    (void)pthread_create(&g_fsThread, NULL, FsWorkThread, g_fsAgentControl);
 }
 
 void FsAgentThreadJoin(void)
 {
-	(void)pthread_join(g_fsThread, NULL);
+    (void)pthread_join(g_fsThread, NULL);
 }
 
 void FsAgentExit(void)
 {
-	if (g_fsAgentFd >= 0) {
-		AgentExit(AGENT_FS_ID, g_fsAgentFd);
-		g_fsAgentFd = -1;
-		g_fsAgentControl = NULL;
-	}
+    if (g_fsAgentFd >= 0) {
+        AgentExit(AGENT_FS_ID, g_fsAgentFd);
+        g_fsAgentFd = -1;
+        g_fsAgentControl = NULL;
+    }
 }
 
 static void SetCurrentUserId(uint32_t id)
@@ -497,7 +497,7 @@ static int32_t JoinFileName(const char *name, bool isBackup, char *path, size_t 
     }
 
     tlogv("joined path done\n");
-	(void)isBackup;
+    (void)isBackup;
     return ret;
 }
 
@@ -510,18 +510,18 @@ static bool IsDataDir(const char *path, bool isUsers)
     ret = GetTransientDir(secDataDir, FILE_NAME_MAX_BUF);
     if (ret != 0) {
         return false;
-	}
+    }
     if (isUsers) {
         rc = strncat_s(secDataDir, FILE_NAME_MAX_BUF, SFS_PARTITION_USER_SYMLINK, strlen(SFS_PARTITION_USER_SYMLINK));
     } else {
         rc = strncat_s(secDataDir, FILE_NAME_MAX_BUF, SFS_PARTITION_TRANSIENT, strlen(SFS_PARTITION_TRANSIENT));
     }
     if (rc != EOK) {
-		return false;
-	}
+        return false;
+    }
     if (path == strstr(path, secDataDir)) {
-		return true;
-	}
+        return true;
+    }
     return false;
 }
 
@@ -533,15 +533,15 @@ static bool IsRootDir(const char *path)
 
     ret = GetPersistentDir(secRootDir, FILE_NAME_MAX_BUF);
     if (ret != 0) {
-		return false;
-	}
+        return false;
+    }
     rc = strncat_s(secRootDir, FILE_NAME_MAX_BUF, SFS_PARTITION_PERSISTENT, strlen(SFS_PARTITION_PERSISTENT));
     if (rc != EOK) {
-		return false;
-	}
+        return false;
+    }
     if (path == strstr(path, secRootDir)) {
-		return true;
-	}
+        return true;
+    }
     return false;
 }
 
@@ -723,31 +723,31 @@ static int32_t CheckPartitionReady(const char *mntDir)
 
 static int CheckOpenWorkValid(struct SecStorageType *transControl, bool isBackup, char *nameBuff, size_t nameLen)
 {
-	int ret = 0;
-	if (transControl->cmd == SEC_CREATE) {
-		/* create a exist file, remove it at first */
-		errno_t rc = strncpy_s(transControl->args.open.mode,
-			sizeof(transControl->args.open.mode), "w+", sizeof("w+"));
-		if (rc != EOK) {
-			tloge("strncpy_s failed %d\n", rc);
-			ret = ENOENT;
-		}
-	} else {
-		if (IsFileExist(nameBuff) == 0) {
-			/* open a nonexist file, return fail */
-			ret = ENOENT;
-		}
-	}
-	(void)isBackup;
-	(void)nameLen;
-	return ret;
+    int ret = 0;
+    if (transControl->cmd == SEC_CREATE) {
+        /* create a exist file, remove it at first */
+        errno_t rc = strncpy_s(transControl->args.open.mode,
+            sizeof(transControl->args.open.mode), "w+", sizeof("w+"));
+        if (rc != EOK) {
+            tloge("strncpy_s failed %d\n", rc);
+            ret = ENOENT;
+        }
+    } else {
+        if (IsFileExist(nameBuff) == 0) {
+            /* open a nonexist file, return fail */
+            ret = ENOENT;
+        }
+    }
+    (void)isBackup;
+    (void)nameLen;
+    return ret;
 }
 
 static void OpenWork(struct SecStorageType *transControl)
 {
     uint32_t error;
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
-	bool isBackup = false;
+    bool isBackup = false;
 
     SetCurrentUserId(transControl->userId);
     SetCurrentStorageId(transControl->storageId);
@@ -767,10 +767,10 @@ static void OpenWork(struct SecStorageType *transControl)
         return;
     }
 
-	if (CheckOpenWorkValid(transControl, isBackup, nameBuff, sizeof(nameBuff)) != 0) {
-		errno = ENOENT;
-		goto ERROR;
-	}
+    if (CheckOpenWorkValid(transControl, isBackup, nameBuff, sizeof(nameBuff)) != 0) {
+        error = ENOENT;
+        goto ERROR;
+    }
 
     /* mkdir -p for new create files */
     if (CreateDir(nameBuff, sizeof(nameBuff)) != 0) {
@@ -911,7 +911,7 @@ static void RemoveWork(struct SecStorageType *transControl)
 {
     int32_t ret;
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
-	bool isBackup = false;
+    bool isBackup = false;
 
     tlogv("sec storage : remove\n");
 
@@ -936,7 +936,7 @@ static void TruncateWork(struct SecStorageType *transControl)
 {
     int32_t ret;
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
-	bool isBackup = false;
+    bool isBackup = false;
 
     tlogv("sec storage : truncate, len=%u\n", transControl->args.truncate.len);
 
@@ -962,16 +962,16 @@ static void RenameWork(struct SecStorageType *transControl)
     int32_t ret;
     char nameBuff[FILE_NAME_MAX_BUF]  = { 0 };
     char nameBuff2[FILE_NAME_MAX_BUF] = { 0 };
-	bool oldIsBackup = false;
-	bool newIsBackup = false;
+    bool oldIsBackup = false;
+    bool newIsBackup = false;
 
     SetCurrentUserId(transControl->userId);
     SetCurrentStorageId(transControl->storageId);
 
     int32_t joinOldRet = JoinFileName((char *)(transControl->args.rename.buffer), oldIsBackup,
-									nameBuff, sizeof(nameBuff));
+                                      nameBuff, sizeof(nameBuff));
     int32_t joinNewRet = JoinFileName((char *)(transControl->args.rename.buffer) + transControl->args.rename.oldNameLen,
-                                    newIsBackup, nameBuff2, sizeof(nameBuff2));
+                                      newIsBackup, nameBuff2, sizeof(nameBuff2));
     if (joinOldRet == 0 && joinNewRet == 0) {
         ret = rename(nameBuff, nameBuff2);
         if (ret != 0) {
@@ -1055,14 +1055,14 @@ static int32_t CopyFile(const char *fromPath, const char *toPath)
 
     int32_t ret = fstat(fromFd, &fromStat);
     if (ret == -1) {
-        tloge("open to_file failed: %d\n", errno);
+        tloge("stat_file failed: %d\n", errno);
         close(fromFd);
         return ret;
     }
 
     int32_t toFd = open(realToPath, O_WRONLY | O_TRUNC | O_CREAT, fromStat.st_mode);
     if (toFd == -1) {
-        tloge("stat file failed: %d\n", errno);
+        tloge("open to_file failed: %d\n", errno);
         close(fromFd);
         return -1;
     }
@@ -1084,14 +1084,14 @@ static void CopyWork(struct SecStorageType *transControl)
     int32_t ret;
     char fromPath[FILE_NAME_MAX_BUF] = { 0 };
     char toPath[FILE_NAME_MAX_BUF]   = { 0 };
-	bool fromIsBackup = false;
-	bool toIsBackup = false;
+    bool fromIsBackup = false;
+    bool toIsBackup = false;
 
     SetCurrentUserId(transControl->userId);
     SetCurrentStorageId(transControl->storageId);
 
-	char *fromName = (char *)(transControl->args.cp.buffer);
-	char *toName = (char *)transControl->args.cp.buffer + transControl->args.cp.fromPathLen;
+    char *fromName = (char *)(transControl->args.cp.buffer);
+    char *toName = (char *)transControl->args.cp.buffer + transControl->args.cp.fromPathLen;
 
     int32_t joinFromRet = JoinFileName(fromName, fromIsBackup, fromPath, sizeof(fromPath));
     int32_t joinToRet = JoinFileName(toName, toIsBackup, toPath, sizeof(toPath));
@@ -1139,7 +1139,7 @@ static void FileAccessWork(struct SecStorageType *transControl)
 {
     int32_t ret;
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
-	bool isBackup = false;
+    bool isBackup = false;
 
     tlogv("sec storage : file access\n");
 

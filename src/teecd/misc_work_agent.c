@@ -31,46 +31,46 @@
 
 /* agentfd & agent control */
 static int g_miscAgentFd = -1;
-static struct MiscControlType g_miscAgentControl = NULL;
+static struct MiscControlType *g_miscAgentControl = NULL;
 static pthread_t g_miscThread = ULONG_MAX;
 
 int GetMiscAgentFd(void)
 {
-	return g_miscAgentFd;
+    return g_miscAgentFd;
 }
 
 void *GetMiscAgentControl(void)
 {
-	return g_miscAgentControl;
+    return g_miscAgentControl;
 }
 
 int MiscAgentInit(void)
 {
-	g_miscAgentFd = AgentInit(AGENT_MISC_ID, (void **)(&g_miscAgentControl));
-	if (g_miscAgentFd < 0) {
-		tloge("misc agent init failed\n");
-		return -1;
-	}
-	return 0;
+    g_miscAgentFd = AgentInit(AGENT_MISC_ID, (void **)(&g_miscAgentControl));
+    if (g_miscAgentFd < 0) {
+        tloge("misc agent init failed\n");
+        return -1;
+    }
+    return 0;
 }
 
 void MiscAgentThreadCreate(void)
 {
-	(void)pthread_create(&g_miscThread, NULL, MiscWorkThread, g_miscAgentControl);
+    (void)pthread_create(&g_miscThread, NULL, MiscWorkThread, g_miscAgentControl);
 }
 
 void MiscAgentThreadJoin(void)
 {
-	(void)pthread_join(g_miscThread, NULL);
+    (void)pthread_join(g_miscThread, NULL);
 }
 
 void MiscAgentExit(void)
 {
-	if (g_miscAgentFd >= 0) {
-		AgentExit(AGENT_MISC_ID, g_miscAgentFd);
-		g_miscAgentFd = -1;
-		g_miscAgentControl = NULL;
-	}
+    if (g_miscAgentFd >= 0) {
+        AgentExit(AGENT_MISC_ID, g_miscAgentFd);
+        g_miscAgentFd = -1;
+        g_miscAgentControl = NULL;
+    }
 }
 
 static void GetTimeWork(struct MiscControlType *transControl)

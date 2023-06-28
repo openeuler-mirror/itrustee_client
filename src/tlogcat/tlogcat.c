@@ -94,9 +94,9 @@ static int32_t g_devFd = -1;
 static char g_teeVersion[MAX_TEE_VERSION_LEN];
 static int32_t g_readposCur = 0;
 static struct ModuleInfo g_tlogcatModuleInfo = {
-	.deviceName = TC_LOGGER_DEV_NAME,
-	.moduleName = "tlogcat",
-	.ioctlNum = TEELOGGER_GET_TEE_INFO,
+    .deviceName = TC_LOGGER_DEV_NAME,
+    .moduleName = "tlogcat",
+    .ioctlNum = TEELOGGER_GET_TEE_INFO,
 };
 
 static int32_t GetLogPathBasePos(const char *temp, char **pos)
@@ -374,7 +374,7 @@ static void TriggerCompress(void)
         }
         ret = chmod(filesToCompress[i], S_IRUSR | S_IWUSR | S_IRGRP);
         if (ret != 0) {
-           tloge("trigger compress chmod failed\n");
+            tloge("trigger compress chmod failed\n");
         }
     }
 
@@ -696,13 +696,13 @@ static int32_t LogFilesChecklimit(uint32_t fileNum)
 #else
 
 static int32_t LogAssembleFilename(char *logName, size_t logNameLen,
-		const char *logPath, const struct FileNameAttr *nameAttr)
+    const char *logPath, const struct FileNameAttr *nameAttr)
 {
-	if (nameAttr->isTa) {
-		return snprintf_s(logName, logNameLen, logNameLen - 1, "%s%s", logPath, "ta_runlog.log");
-	} else {
-		return snprintf_s(logName, logNameLen, logNameLen - 1, "%s%s". logPath, "teeos_runlog.log");
-	}
+    if (nameAttr->isTa) {
+        return snprintf_s(logName, logNameLen, logNameLen - 1, "%s%s", logPath, "ta_runlog.log");
+    } else {
+        return snprintf_s(logName, logNameLen, logNameLen - 1, "%s%s", logPath, "teeos_runlog.log");
+    }
 }
 #endif
 
@@ -731,7 +731,6 @@ static struct LogFile *GetUsableFile(const struct TeeUuid *uuid)
             continue;
         }
 #endif
-
         tlogd("get log file %s\n", g_files[i].logName);
         return &g_files[i];
     }
@@ -827,8 +826,8 @@ static void LogFilesClose(void)
 
         tlogd("close file %s, fileLen %ld\n", g_files[i].logName, g_files[i].fileLen);
         (void)fflush(g_files[i].file);
-		int32_t fd = fileno(g_files[i].file);
-		(void)fsync(fd);
+        int32_t fd = fileno(g_files[i].file);
+        (void)fsync(fd);
         (void)fclose(g_files[i].file);
 
 #ifndef TEE_LOG_NON_REWINDING
@@ -844,7 +843,7 @@ static void LogFilesClose(void)
 
         int32_t ret = chmod(g_files[i].logName, S_IRUSR | S_IRGRP);
         if (ret != 0) {
-            tlogi("close file: %s failed, chmod ret: %d errno: %d\n", g_files[i].logName, ret, errno);
+            tlogi("close file: %s chmod ret: %d errno: %d\n", g_files[i].logName, ret, errno);
         }
 #endif
         (void)memset_s(&g_files[i], sizeof(g_files[i]), 0, sizeof(g_files[i]));
@@ -957,7 +956,7 @@ static void WritePrivateLogFile(const struct LogItem *logItem, bool isTa)
 static void WriteLogFile(const struct LogItem *logItem)
 {
     bool isTa = IsTaUuid((struct TeeUuid *)logItem->uuid);
-#ifdef TEE_LOG_NON_REWINDING
+#ifndef TEE_LOG_NON_REWINDING
     LogWriteSysLog(logItem, isTa);
 #endif
     WritePrivateLogFile(logItem, isTa);
@@ -1102,10 +1101,10 @@ static void Func(bool writeFile)
 static void GetTeePathGroup(void)
 {
 #ifdef AID_SYSTEM
-	g_teePathGroup = AID_SYSTEM;
+    g_teePathGroup = AID_SYSTEM;
 #else
     struct stat pathStat = {0};
-    
+
     if (stat(TEE_LOG_PATH_BASE, &pathStat) != 0) {
         tloge("get base path stat failed\n");
         return;
@@ -1129,6 +1128,9 @@ static int32_t GetTeeLogPath(void)
     GetTeePathGroup();
 #ifdef TEE_LOG_NON_REWINDING
     ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
+		"%s/", TEE_LOG_PATH_BASE);
+#else
+    ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
 		"%s", TEE_LOG_PATH_BASE);
 #else
 	ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
@@ -1150,8 +1152,8 @@ static int32_t GetTeeLogPath(void)
 
 static int32_t TlogcatCheckTzdriverVersion(void)
 {
-	InitModuleInfo(&g_tlogcatModuleInfo);
-	return CheckTzdriverVersion();
+    InitModuleInfo(&g_tlogcatModuleInfo);
+    return CheckTzdriverVersion();
 }
 
 static int32_t Prepare(void)
@@ -1183,10 +1185,10 @@ static int32_t Prepare(void)
 
     tlogd("open dev success g_devFd=%d\n", g_devFd);
 
-	if (TlogcatCheckTzdriverVersion() != 0) {
-		tloge("check tlogcat & tzdriver version failed\n");
-		return -1;
-	}
+    if (TlogcatCheckTzdriverVersion() != 0) {
+        tloge("check tlogcat & tzdriver version failed\n");
+        return -1;
+    }
 
     /* get tee version info */
     ret = ioctl(g_devFd, TEELOGGER_GET_VERSION, g_teeVersion);

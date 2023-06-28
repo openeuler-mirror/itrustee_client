@@ -61,11 +61,11 @@ typedef struct {
 } CaRevMsg;
 
 typedef union {
-	int teeMaxApiLevel;
-	struct {
-		uint16_t majorVersion;
-		uint16_t minorVersion;
-	};
+    int teeMaxApiLevel;
+    struct {
+        uint16_t majorVersion;
+        uint16_t minorVersion;
+    };
 } RecvTeecdMsg;
 
 typedef struct {

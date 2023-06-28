@@ -14,9 +14,9 @@
 #define TEE_VERSION_CHECK_H
 
 struct ModuleInfo {
-	const char *deviceName;
-	const char *moduleName;
-	unsigned long ioctlNum;
+    const char *deviceName;
+    const char *moduleName;
+    unsigned long ioctlNum;
 };
 
 void InitModuleInfo(struct ModuleInfo *info);

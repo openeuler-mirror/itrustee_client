@@ -42,7 +42,7 @@ int32_t LoadSecFile(int tzFd, FILE *fp, enum SecFileType fileType, const TEEC_UU
 {
     int32_t ret;
     char *fileBuffer                   = NULL;
-    struct SecLoadIoctlStruct ioctlArg = { { 0 }, { 0 }, { NULL } };
+    struct SecLoadIoctlStruct ioctlArg = {{ 0 }, { 0 }, { NULL } };
 
     if (tzFd < 0 || fp == NULL) {
         tloge("param error!\n");
