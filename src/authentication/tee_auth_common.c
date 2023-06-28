@@ -22,7 +22,6 @@
 #endif
 #define LOG_TAG "teecd_auth"
 
-#define PASSWD_FILE "/etc/passwd"
 #define DELIM_COUNT 6U
 #define NAME_POS    0U
 #define UID_POS     1U
@@ -89,15 +88,22 @@ static int ParseUserName(unsigned int caUid, const char *userName, int nameBufLe
 }
 
 /* get username by uid,
- * on linux, user info is stored in system file "/etc/passwd",
+ * on linux, user info is stored in system file "/proc/<pid>/root/etc/passwd",
  * each line represents a user, fields are separated by ':',
  * formatted as such: "username:[encrypted password]:uid:gid:[comments]:home directory:login shell"
  */
-int TeeGetUserName(unsigned int caUid, char *userName, size_t nameBufLen)
+int TeeGetUserName(int caPid, unsigned int caUid, char *userName, size_t nameBufLen)
 {
     int i;
+	char path[MAX_PATH_LENGTH] = { 0 };
 
-    FILE *fd = fopen(PASSWD_FILE, "r");
+	int ret = snprintf_s(path, sizeof(path), sizeof(path) - 1, "/proc/%d/root/etc/passwd", caPid);
+	if (ret == -1) {
+		tloge("get passwd filename failed\n");
+		return -1;
+	}
+
+    FILE *fd = fopen(path, "r");
     if (fd == NULL) {
         tloge("open passwd file failed\n");
         return -1;
@@ -289,7 +295,7 @@ static int TeeCheckCaPath(unsigned int uid, int pid, const char *auth_ctx)
         return TEEC_ERROR_ACCESS_DENIED;
     }
 
-    if (strncmp(str_path_uid, auth_ctx, auth_ctx_len) != 0) {
+    if (strnlen(str_path_uid, BUF_MAX_SIZE) != auth_ctx_len || strncmp(str_path_uid, auth_ctx, auth_ctx_len) != 0) {
         tloge("check path failed\n");
         return TEEC_ERROR_ACCESS_DENIED;
     }

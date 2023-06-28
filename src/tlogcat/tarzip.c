@@ -171,7 +171,7 @@ static int32_t OpenZipFile(const char *outputName, gzFile *outFile, gid_t pathGr
 
     int32_t fd = open(outputName, O_CREAT | O_WRONLY, ZIP_OPEN_MODE);
     if (fd < 0) {
-        tloge("open file failed\n");
+        tloge("open file[%s] failed, errno = %d\n", outputName, errno);
         return -1;
     }
     gzFile out = gzdopen(fd, "w");
@@ -182,13 +182,13 @@ static int32_t OpenZipFile(const char *outputName, gzFile *outFile, gid_t pathGr
     }
     ret = fchown(fd, (uid_t)-1, pathGroup);
     if (ret < 0) {
-        tloge("chown failed\n");
+        tloge("chown failed, errno = %d\n", errno);
         gzclose(out);
         return -1;
     }
     ret = fchmod(fd, S_IRUSR | S_IRGRP);
     if (ret < 0) {
-        tloge("chmod failed\n");
+        tloge("chmod failed, errno = %d\n", errno);
         gzclose(out);
         return -1;
     }

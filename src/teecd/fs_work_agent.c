@@ -14,8 +14,10 @@
 #include <errno.h>     /* for errno */
 #include <sys/types.h> /* for open close */
 #include <fcntl.h>
+#include <limits.h>
 #include <sys/ioctl.h> /* for ioctl */
 #include <time.h>
+#include <pthread.h>
 #include <dirent.h>
 #include <sys/statfs.h>
 #include <sys/resource.h>
@@ -32,11 +34,58 @@
 #undef LOG_TAG
 #endif
 #define LOG_TAG       "teecd_agent"
-#define USER_PATH_LEN 10
+
+static int32_t CopyFile(const char *fromPath, const char *toPath);
 
 /* record the current g_userId and g_storageId */
 static uint32_t g_userId;
 static uint32_t g_storageId;
+
+/* agentfd & agent control */
+static int g_fsAgentFd = -1;
+static struct SecStorageType *g_fsAgentControl = NULL;
+static pthread_t g_fsThread = ULONG_MAX;
+
+int GetFsAgentFd(void)
+{
+	return g_fsAgentFd;
+}
+
+void *GetFsAgentControl(void)
+{
+	return g_fsAgentControl;
+}
+
+int FsAgentInit(void)
+{
+	g_fsAgentFd = AgentInit(AGENT_FS_ID, (void **)(&g_fsAgentControl));
+	if (g_fsAgentFd < 0) {
+		tloge("fs agent init failed\n");
+		return -1;
+	}
+	return 0;
+}
+
+void FsAgentThreadCreate(void)
+{
+	SetFileNumLimit();
+	(void)pthread_create(&g_fsThread, NULL, FsWorkThread, g_fsAgentControl);
+}
+
+void FsAgentThreadJoin(void)
+{
+	(void)pthread_join(g_fsThread, NULL);
+}
+
+void FsAgentExit(void)
+{
+	if (g_fsAgentFd >= 0) {
+		AgentExit(AGENT_FS_ID, g_fsAgentFd);
+		g_fsAgentFd = -1;
+		g_fsAgentControl = NULL;
+	}
+}
+
 static void SetCurrentUserId(uint32_t id)
 {
     g_userId = id;
@@ -424,7 +473,7 @@ static int32_t JoinFileNameForStorageCE(const char *name, char *path, size_t pat
     return 0;
 }
 
-static int32_t JoinFileName(const char *name, char *path, size_t pathLen)
+static int32_t JoinFileName(const char *name, bool isBackup, char *path, size_t pathLen)
 {
     int32_t ret = -1;
     uint32_t storageId = GetCurrentStorageId();
@@ -448,6 +497,7 @@ static int32_t JoinFileName(const char *name, char *path, size_t pathLen)
     }
 
     tlogv("joined path done\n");
+	(void)isBackup;
     return ret;
 }
 
@@ -458,17 +508,20 @@ static bool IsDataDir(const char *path, bool isUsers)
     errno_t rc;
 
     ret = GetTransientDir(secDataDir, FILE_NAME_MAX_BUF);
-    if (ret != 0)
+    if (ret != 0) {
         return false;
+	}
     if (isUsers) {
         rc = strncat_s(secDataDir, FILE_NAME_MAX_BUF, SFS_PARTITION_USER_SYMLINK, strlen(SFS_PARTITION_USER_SYMLINK));
     } else {
         rc = strncat_s(secDataDir, FILE_NAME_MAX_BUF, SFS_PARTITION_TRANSIENT, strlen(SFS_PARTITION_TRANSIENT));
     }
-    if (rc != EOK)
-        return false;
-    if (path == strstr(path, secDataDir))
-        return true;
+    if (rc != EOK) {
+		return false;
+	}
+    if (path == strstr(path, secDataDir)) {
+		return true;
+	}
     return false;
 }
 
@@ -479,13 +532,16 @@ static bool IsRootDir(const char *path)
     errno_t rc;
 
     ret = GetPersistentDir(secRootDir, FILE_NAME_MAX_BUF);
-    if (ret != 0)
-        return false;
+    if (ret != 0) {
+		return false;
+	}
     rc = strncat_s(secRootDir, FILE_NAME_MAX_BUF, SFS_PARTITION_PERSISTENT, strlen(SFS_PARTITION_PERSISTENT));
-    if (rc != EOK)
-        return false;
-    if (path == strstr(path, secRootDir))
-        return true;
+    if (rc != EOK) {
+		return false;
+	}
+    if (path == strstr(path, secRootDir)) {
+		return true;
+	}
     return false;
 }
 
@@ -665,10 +721,33 @@ static int32_t CheckPartitionReady(const char *mntDir)
     return 1;
 }
 
+static int CheckOpenWorkValid(struct SecStorageType *transControl, bool isBackup, char *nameBuff, size_t nameLen)
+{
+	int ret = 0;
+	if (transControl->cmd == SEC_CREATE) {
+		/* create a exist file, remove it at first */
+		errno_t rc = strncpy_s(transControl->args.open.mode,
+			sizeof(transControl->args.open.mode), "w+", sizeof("w+"));
+		if (rc != EOK) {
+			tloge("strncpy_s failed %d\n", rc);
+			ret = ENOENT;
+		}
+	} else {
+		if (IsFileExist(nameBuff) == 0) {
+			/* open a nonexist file, return fail */
+			ret = ENOENT;
+		}
+	}
+	(void)isBackup;
+	(void)nameLen;
+	return ret;
+}
+
 static void OpenWork(struct SecStorageType *transControl)
 {
     uint32_t error;
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
+	bool isBackup = false;
 
     SetCurrentUserId(transControl->userId);
     SetCurrentStorageId(transControl->storageId);
@@ -683,27 +762,15 @@ static void OpenWork(struct SecStorageType *transControl)
         }
     }
 
-    if (JoinFileName((char *)(transControl->args.open.name), nameBuff, sizeof(nameBuff)) != 0) {
+    if (JoinFileName((char *)(transControl->args.open.name), isBackup, nameBuff, sizeof(nameBuff)) != 0) {
         transControl->ret = -1;
         return;
     }
 
-    if (transControl->cmd == SEC_CREATE) {
-        /* create a exist file, remove it at first */
-        errno_t rc = strncpy_s(transControl->args.open.mode,
-            sizeof(transControl->args.open.mode), "w+", sizeof("w+"));
-        if (rc != EOK) {
-            tloge("strncpy_s failed %d\n", rc);
-            error = ENOENT;
-            goto ERROR;
-        }
-    } else {
-        if (IsFileExist(nameBuff) == 0) {
-            /* open a nonexist file, return fail */
-            error = ENOENT;
-            goto ERROR;
-        }
-    }
+	if (CheckOpenWorkValid(transControl, isBackup, nameBuff, sizeof(nameBuff)) != 0) {
+		errno = ENOENT;
+		goto ERROR;
+	}
 
     /* mkdir -p for new create files */
     if (CreateDir(nameBuff, sizeof(nameBuff)) != 0) {
@@ -844,13 +911,14 @@ static void RemoveWork(struct SecStorageType *transControl)
 {
     int32_t ret;
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
+	bool isBackup = false;
 
     tlogv("sec storage : remove\n");
 
     SetCurrentUserId(transControl->userId);
     SetCurrentStorageId(transControl->storageId);
 
-    if (JoinFileName((char *)(transControl->args.remove.name), nameBuff, sizeof(nameBuff)) == 0) {
+    if (JoinFileName((char *)(transControl->args.remove.name), isBackup, nameBuff, sizeof(nameBuff)) == 0) {
         ret = UnlinkRecursive(nameBuff);
         if (ret != 0) {
             tloge("remove file failed: %d\n", errno);
@@ -868,13 +936,14 @@ static void TruncateWork(struct SecStorageType *transControl)
 {
     int32_t ret;
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
+	bool isBackup = false;
 
     tlogv("sec storage : truncate, len=%u\n", transControl->args.truncate.len);
 
     SetCurrentUserId(transControl->userId);
     SetCurrentStorageId(transControl->storageId);
 
-    if (JoinFileName((char *)(transControl->args.truncate.name), nameBuff, sizeof(nameBuff)) == 0) {
+    if (JoinFileName((char *)(transControl->args.truncate.name), isBackup, nameBuff, sizeof(nameBuff)) == 0) {
         ret = truncate(nameBuff, (long)transControl->args.truncate.len);
         if (ret != 0) {
             tloge("truncate file failed: %d\n", errno);
@@ -893,14 +962,17 @@ static void RenameWork(struct SecStorageType *transControl)
     int32_t ret;
     char nameBuff[FILE_NAME_MAX_BUF]  = { 0 };
     char nameBuff2[FILE_NAME_MAX_BUF] = { 0 };
+	bool oldIsBackup = false;
+	bool newIsBackup = false;
 
     SetCurrentUserId(transControl->userId);
     SetCurrentStorageId(transControl->storageId);
 
-    int32_t joinRet1 = JoinFileName((char *)(transControl->args.rename.buffer), nameBuff, sizeof(nameBuff));
-    int32_t joinRet2 = JoinFileName((char *)(transControl->args.rename.buffer) + transControl->args.rename.oldNameLen,
-                                    nameBuff2, sizeof(nameBuff2));
-    if (joinRet1 == 0 && joinRet2 == 0) {
+    int32_t joinOldRet = JoinFileName((char *)(transControl->args.rename.buffer), oldIsBackup,
+									nameBuff, sizeof(nameBuff));
+    int32_t joinNewRet = JoinFileName((char *)(transControl->args.rename.buffer) + transControl->args.rename.oldNameLen,
+                                    newIsBackup, nameBuff2, sizeof(nameBuff2));
+    if (joinOldRet == 0 && joinNewRet == 0) {
         ret = rename(nameBuff, nameBuff2);
         if (ret != 0) {
             tloge("rename file failed: %d\n", errno);
@@ -977,13 +1049,13 @@ static int32_t CopyFile(const char *fromPath, const char *toPath)
 
     int32_t fromFd = open(realFromPath, O_RDONLY, 0);
     if (fromFd == -1) {
-        tloge("open file failed: %d\n", errno);
+        tloge("open from_file failed: %d\n", errno);
         return -1;
     }
 
     int32_t ret = fstat(fromFd, &fromStat);
     if (ret == -1) {
-        tloge("stat file failed: %d\n", errno);
+        tloge("open to_file failed: %d\n", errno);
         close(fromFd);
         return ret;
     }
@@ -1012,14 +1084,18 @@ static void CopyWork(struct SecStorageType *transControl)
     int32_t ret;
     char fromPath[FILE_NAME_MAX_BUF] = { 0 };
     char toPath[FILE_NAME_MAX_BUF]   = { 0 };
+	bool fromIsBackup = false;
+	bool toIsBackup = false;
 
     SetCurrentUserId(transControl->userId);
     SetCurrentStorageId(transControl->storageId);
 
-    int32_t joinRet1 = JoinFileName((char *)(transControl->args.cp.buffer), fromPath, sizeof(fromPath));
-    int32_t joinRet2 = JoinFileName((char *)(transControl->args.cp.buffer) + transControl->args.cp.fromPathLen, toPath,
-                                    sizeof(toPath));
-    if (joinRet1 == 0 && joinRet2 == 0) {
+	char *fromName = (char *)(transControl->args.cp.buffer);
+	char *toName = (char *)transControl->args.cp.buffer + transControl->args.cp.fromPathLen;
+
+    int32_t joinFromRet = JoinFileName(fromName, fromIsBackup, fromPath, sizeof(fromPath));
+    int32_t joinToRet = JoinFileName(toName, toIsBackup, toPath, sizeof(toPath));
+    if (joinFromRet == 0 && joinToRet == 0) {
         ret = CopyFile(fromPath, toPath);
         if (ret != 0) {
             tloge("copy file failed: %d\n", errno);
@@ -1063,6 +1139,7 @@ static void FileAccessWork(struct SecStorageType *transControl)
 {
     int32_t ret;
     char nameBuff[FILE_NAME_MAX_BUF] = { 0 };
+	bool isBackup = false;
 
     tlogv("sec storage : file access\n");
 
@@ -1070,7 +1147,7 @@ static void FileAccessWork(struct SecStorageType *transControl)
         SetCurrentUserId(transControl->userId);
         SetCurrentStorageId(transControl->storageId);
 
-        if (JoinFileName((char *)(transControl->args.access.name), nameBuff, sizeof(nameBuff)) == 0) {
+        if (JoinFileName((char *)(transControl->args.access.name), isBackup, nameBuff, sizeof(nameBuff)) == 0) {
             ret = access(nameBuff, transControl->args.access.mode);
             if (ret < 0) {
                 tloge("access file mode %d failed: %d\n", transControl->args.access.mode, errno);
@@ -1227,7 +1304,7 @@ void *FsWorkThread(void *control)
     }
     transControl = control;
 
-    fsFd = GetFsFd();
+    fsFd = g_fsAgentFd;
     if (fsFd == -1) {
         tloge("fs is not open\n");
         return NULL;

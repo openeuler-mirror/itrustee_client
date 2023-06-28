@@ -107,12 +107,12 @@ static int SetUserNameToBuf(uint8_t *buffer, uint32_t *len, uint32_t *inputLen, 
     return ret;
 }
 
-static int SetUserInfoToBuf(uint8_t *buffer, uint32_t *len, uint32_t *inputLen, unsigned int caUid)
+static int SetUserInfoToBuf(uint8_t *buffer, uint32_t *len, uint32_t *inputLen, int caPid, unsigned int caUid)
 {
     int ret;
 
     char userName[MAX_NAME_LENGTH] = { 0 };
-    ret = TeeGetUserName(caUid, userName, sizeof(userName));
+    ret = TeeGetUserName(caPid, caUid, userName, sizeof(userName));
     if (ret != 0) {
         tloge("get user name failed\n");
         return ret;
@@ -153,5 +153,5 @@ int TeeGetNativeCert(int caPid, unsigned int caUid, uint32_t *len, uint8_t *buff
     }
     buffer += (sizeof(uint32_t) + strlen(path));
 
-    return SetUserInfoToBuf(buffer, len, &inputLen, caUid);
+    return SetUserInfoToBuf(buffer, len, &inputLen, caPid, caUid);
 }

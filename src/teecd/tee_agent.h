@@ -15,8 +15,14 @@
 #define AGENT_FS_ID 0x46536673
 #define AGENT_MISC_ID 0x4d495343
 
-int GetMiscFd(void);
-int GetFsFd(void);
+#define TRANS_BUFF_SIZE (4 * 1O24) /* agent transfer share buffer size */
+
+int AgentInit(unsigned int id, void **control);
+void AgentExit(unsigned int id, int fd);
+int ProcessAgentInit(void);
+void ProcessAgentThreadCreate(void);
+void ProcessAgentThreadJoin(void);
+void ProcessAgentExit(void);
 void TrySyncSysTimeToSecure(void);
 
 #endif

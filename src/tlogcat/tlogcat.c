@@ -30,6 +30,9 @@
 #include "tarzip.h"
 #include "proc_tag.h"
 #include "sys_log_api.h"
+#include "tee_client_version.h"
+#include "tc_ns_client.h"
+#include "tee_version_check.h"
 
 #define LOG_FILE_TA_DEMO            "LOG@A32B3D00CB5711E39C1A0800200C9A66-0"
 #define LOG_FILE_TA_COMPRESS_DEMO   "LOG@A32B3D00CB5711E39C1A0800200C9A66-0.tar.gz"
@@ -78,16 +81,23 @@ char *g_logBuffer = NULL;
 #define SET_READERPOS_CUR_BASE        6
 #define SET_TLOGCAT_STAT_BASE         7
 #define GET_TLOGCAT_STAT_BASE         8
+#define GET_TEE_INFO_BASE             9
 
 #define TEELOGGER_GET_VERSION       _IOR(TEELOGGERIO, GET_VERSION_BASE, char[MAX_TEE_VERSION_LEN])
 /* set the log reader pos to current pos */
 #define TEELOGGER_SET_READERPOS_CUR _IO(TEELOGGERIO, SET_READERPOS_CUR_BASE)
 #define TEELOGGER_SET_TLOGCAT_STAT  _IO(TEELOGGERIO, SET_TLOGCAT_STAT_BASE)
 #define TEELOGGER_GET_TLOGCAT_STAT  _IO(TEELOGGERIO, GET_TLOGCAT_STAT_BASE)
+#define TEELOGGER_GET_TEE_INFO      _IOR(TEELOGGERIO, GET_TEE_INFO_BASE, TC_NS_TEE_Info)
 
 static int32_t g_devFd = -1;
 static char g_teeVersion[MAX_TEE_VERSION_LEN];
 static int32_t g_readposCur = 0;
+static struct ModuleInfo g_tlogcatModuleInfo = {
+	.deviceName = TC_LOGGER_DEV_NAME,
+	.moduleName = "tlogcat",
+	.ioctlNum = TEELOGGER_GET_TEE_INFO,
+};
 
 static int32_t GetLogPathBasePos(const char *temp, char **pos)
 {
@@ -104,6 +114,8 @@ static int32_t GetLogPathBasePos(const char *temp, char **pos)
 
 /*
  * path:file path name.
+ * P: /data/vendor/log/hisi_logs/tee/
+ * before P version: /data/hisi_logs/running_trace/teeos_logs/LOG@A32B3D00CB5711E39C1A0800200C9A66-0
  */
 static int32_t LogFilesMkdirR(const char *path)
 {
@@ -308,6 +320,7 @@ static void SetFileNameAttr(struct FileNameAttr *nameAttr, const char *uuidAscii
     nameAttr->index = index;
 }
 
+#ifndef TEE_LOG_NON_REWINDING
 static int32_t LogAssembleFilename(char *logName, size_t logNameLen,
     const char *logPath, const struct FileNameAttr *nameAttr)
 {
@@ -680,6 +693,19 @@ static int32_t LogFilesChecklimit(uint32_t fileNum)
     return 0;
 }
 
+#else
+
+static int32_t LogAssembleFilename(char *logName, size_t logNameLen,
+		const char *logPath, const struct FileNameAttr *nameAttr)
+{
+	if (nameAttr->isTa) {
+		return snprintf_s(logName, logNameLen, logNameLen - 1, "%s%s", logPath, "ta_runlog.log");
+	} else {
+		return snprintf_s(logName, logNameLen, logNameLen - 1, "%s%s". logPath, "teeos_runlog.log");
+	}
+}
+#endif
+
 static struct LogFile *GetUsableFile(const struct TeeUuid *uuid)
 {
     uint32_t i;
@@ -699,10 +725,12 @@ static struct LogFile *GetUsableFile(const struct TeeUuid *uuid)
             continue;
         }
 
+#ifndef TEE_LOG_NON_REWINDING
         /* check file len is limit */
         if (LogFilesChecklimit(i) != 0) {
             continue;
         }
+#endif
 
         tlogd("get log file %s\n", g_files[i].logName);
         return &g_files[i];
@@ -799,8 +827,11 @@ static void LogFilesClose(void)
 
         tlogd("close file %s, fileLen %ld\n", g_files[i].logName, g_files[i].fileLen);
         (void)fflush(g_files[i].file);
+		int32_t fd = fileno(g_files[i].file);
+		(void)fsync(fd);
         (void)fclose(g_files[i].file);
 
+#ifndef TEE_LOG_NON_REWINDING
         if (g_files[i].fileLen >= LOG_FILE_LIMIT) {
             if (g_files[i].fileIndex >= (LOG_FILE_INDEX_MAX - 1)) {
                 /* four files are all full, need to compress files. */
@@ -813,9 +844,9 @@ static void LogFilesClose(void)
 
         int32_t ret = chmod(g_files[i].logName, S_IRUSR | S_IRGRP);
         if (ret != 0) {
-            tloge("close chmod file: %s failed, ret: %d\n", g_files[i].logName, ret);
+            tlogi("close file: %s failed, chmod ret: %d errno: %d\n", g_files[i].logName, ret, errno);
         }
-
+#endif
         (void)memset_s(&g_files[i], sizeof(g_files[i]), 0, sizeof(g_files[i]));
     }
 }
@@ -926,8 +957,9 @@ static void WritePrivateLogFile(const struct LogItem *logItem, bool isTa)
 static void WriteLogFile(const struct LogItem *logItem)
 {
     bool isTa = IsTaUuid((struct TeeUuid *)logItem->uuid);
-
+#ifdef TEE_LOG_NON_REWINDING
     LogWriteSysLog(logItem, isTa);
+#endif
     WritePrivateLogFile(logItem, isTa);
 }
 
@@ -1069,6 +1101,9 @@ static void Func(bool writeFile)
 
 static void GetTeePathGroup(void)
 {
+#ifdef AID_SYSTEM
+	g_teePathGroup = AID_SYSTEM;
+#else
     struct stat pathStat = {0};
     
     if (stat(TEE_LOG_PATH_BASE, &pathStat) != 0) {
@@ -1076,6 +1111,7 @@ static void GetTeePathGroup(void)
         return;
     }
     g_teePathGroup = pathStat.st_gid;
+#endif
 }
 
 #define MAX_TEE_LOG_SUBFOLDER_LEN      30U
@@ -1091,9 +1127,13 @@ static int32_t GetTeeLogPath(void)
     }
 
     GetTeePathGroup();
-
+#ifdef TEE_LOG_NON_REWINDING
     ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
+		"%s", TEE_LOG_PATH_BASE);
+#else
+	ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
         "%s/%s/", TEE_LOG_PATH_BASE, TEE_LOG_SUBFOLDER);
+#endif
     if (ret < 0) {
         tloge("get tee log path failed\n");
         return -1;
@@ -1106,6 +1146,12 @@ static int32_t GetTeeLogPath(void)
         return -1;
     }
     return 0;
+}
+
+static int32_t TlogcatCheckTzdriverVersion(void)
+{
+	InitModuleInfo(&g_tlogcatModuleInfo);
+	return CheckTzdriverVersion();
 }
 
 static int32_t Prepare(void)
@@ -1129,13 +1175,18 @@ static int32_t Prepare(void)
 
     (void)memset_s(g_files, (sizeof(struct LogFile) * LOG_FILES_MAX), 0, (sizeof(struct LogFile) * LOG_FILES_MAX));
 
-    g_devFd = open("/dev/teelog", O_RDONLY);
+    g_devFd = open(TC_LOGGER_DEV_NAME, O_RDONLY);
     if (g_devFd < 0) {
         tloge("open log device error\n");
         return -1;
     }
 
     tlogd("open dev success g_devFd=%d\n", g_devFd);
+
+	if (TlogcatCheckTzdriverVersion() != 0) {
+		tloge("check tlogcat & tzdriver version failed\n");
+		return -1;
+	}
 
     /* get tee version info */
     ret = ioctl(g_devFd, TEELOGGER_GET_VERSION, g_teeVersion);

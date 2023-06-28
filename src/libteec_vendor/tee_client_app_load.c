@@ -189,7 +189,7 @@ static int32_t TEEC_DoReadApp(FILE *fp, TC_NS_ClientContext *cliContext)
     /* get magic-num & version-num */
     int32_t ret = TEEC_GetImageLenth(fp, &totalImgLen);
     if (ret != 0) {
-        tloge("get image lenth fail\n");
+        tloge("get image length fail\n");
         return -1;
     }
 

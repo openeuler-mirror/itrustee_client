@@ -28,11 +28,13 @@
 #define TC_NS_CLIENT_DEV       "tc_ns_client"
 #define TC_NS_CLIENT_DEV_NAME  "/dev/tc_ns_client"
 #define TC_TEECD_PRIVATE_DEV_NAME  "/dev/tc_private"
+#define TC_NS_CVM_DEV_NAME  "/dev/tc_ns_cvm"
 
 enum ConnectCmd {
     GET_FD,
     GET_TEEVERSION,
     SET_SYS_XML,
+	GET_TEECD_VERSION,
 };
 
 typedef struct {
@@ -86,6 +88,12 @@ typedef struct {
     uint32_t seconds;
     uint32_t millis;
 } TC_NS_Time;
+
+typedef struct {
+	uint16_t tzdriver_version_major;
+	uint16_t tzdriver_version_minor;
+	uint32_t reserved[15];
+} TC_NS_TEE_Info;
 
 enum SecFileType {
     LOAD_TA = 0,
@@ -143,6 +151,10 @@ struct AgentIoctlArgs {
 #define TC_NS_CLIENT_IOCTL_LOAD_TTF_FILE_AND_NOTCH_HEIGHT _IOWR(TC_NS_CLIENT_IOC_MAGIC, 19, unsigned int)
 #define TC_NS_CLIENT_IOCTL_LATEINIT                       _IOWR(TC_NS_CLIENT_IOC_MAGIC, 20, unsigned int)
 #define TC_NS_CLIENT_IOCTL_GET_TEE_VERSION                _IOWR(TC_NS_CLIENT_IOC_MAGIC, 21, unsigned int)
+#ifdef CONFIG_CMS_SIGNATURE
+#define TC_NS_CLIENT_IOCTL_UPDATE_TA_CRL                  _IOWR(TC_NS_CLIENT_IOC_MAGIC, 22, struct TC_NS_ClientCrl)
+#endif
+#define TC_NS_CLIENT_IOCTL_GET_TEE_INFO                   _IOWR(TC_NS_CLIENT_IOC_MAGIC, 26, TC_NS_TEE_Info)
 
 TEEC_Result TEEC_CheckOperation(const TEEC_Operation *operation);
 #endif

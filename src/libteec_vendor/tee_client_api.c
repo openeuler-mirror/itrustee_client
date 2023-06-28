@@ -30,7 +30,6 @@
 
 #define TEE_ERROR_CA_AUTH_FAIL 0xFFFFCFE5
 
-#define UNTRUSTED_APP_MININUM_UID 10000
 #define AGENT_BUFF_SIZE           0x1000
 #define CA_AUTH_RETRY_TIMES       30
 #define H_OFFSET                  32
@@ -44,7 +43,6 @@
 #define SHIFT    3
 #define MASK     0x7
 #define BYTE_BIT 8
-#define UNUSED   __attribute__((unused))
 
 /*
  * this initialize function will execute every time when libteec so is about to be

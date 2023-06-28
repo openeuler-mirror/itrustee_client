@@ -20,7 +20,11 @@ static char g_logItemBuffer[LOG_ITEM_MAX_LEN];
 
 void OpenTeeLog(void)
 {
+#ifdef DISABLE_LOG_CONS
+	openlog(LOG_TEEOS_TAG, LOG_NDELAY, LOG_USER);
+#else
     openlog(LOG_TEEOS_TAG, LOG_CONS | LOG_NDELAY, LOG_USER);
+#endif
 }
 
 void CloseTeeLog(void)
@@ -31,7 +35,7 @@ void CloseTeeLog(void)
 static void TeeSyslogPrint(const struct LogItem *logItem, const char *logItemBuffer)
 {
     uint8_t logLevel = logItem->logLevel;
-    uint8_t syslogLevel[TOTAL_LEVEL_NUMS] = {LOG_ERR, LOG_WARNING, LOG_INFO, LOG_DEBUG, LOG_DEBUG};
+    uint8_t syslogLevel[TOTAL_LEVEL_NUMS] = {LOG_ERR, LOG_WARNING, LOG_INFO, LOG_DEBUG, LOG_DEBUG, LOG_CRIT};
 
     if (logLevel < TOTAL_LEVEL_NUMS) {
         logLevel = syslogLevel[logLevel];

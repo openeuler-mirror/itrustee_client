@@ -23,8 +23,6 @@
 #define SEC_STORAGE_DATA_USER_0 USER_DATA_DIR"sec_storage_data_users/0"
 #define SEC_STORAGE_DATA_DIR    USER_DATA_DIR"sec_storage_data/"
 
-#define TRANS_BUFF_SIZE (4 * 1024) /* agent transfer share buffer size */
-
 #define ROOT_DIR "/"
 #define SEC_STORAGE_ROOT_DIR      ROOT_DIR SFS_PARTITION_PERSISTENT
 
@@ -62,5 +60,6 @@ enum MuMsgUserid {
 
 void *CaServerWorkThread(void *dummy);
 int GetTEEVersion(void);
+int TeecdCheckTzdriverVersion(void);
 
 #endif
