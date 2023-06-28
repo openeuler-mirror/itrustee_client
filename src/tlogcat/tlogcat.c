@@ -1128,12 +1128,9 @@ static int32_t GetTeeLogPath(void)
     GetTeePathGroup();
 #ifdef TEE_LOG_NON_REWINDING
     ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
-		"%s/", TEE_LOG_PATH_BASE);
+        "%s/", TEE_LOG_PATH_BASE);
 #else
     ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
-		"%s", TEE_LOG_PATH_BASE);
-#else
-	ret = snprintf_s(g_teePath, sizeof(g_teePath), sizeof(g_teePath) - 1,
         "%s/%s/", TEE_LOG_PATH_BASE, TEE_LOG_SUBFOLDER);
 #endif
     if (ret < 0) {

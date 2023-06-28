@@ -66,7 +66,6 @@ static int ConnectTeecdSocket(int *socketFd)
         close(s);
         return -1;
     }
-
     len = (uint32_t)(strlen(remote.sun_path) + sizeof(remote.sun_family));
 
 #ifndef CONFIG_PATH_NAMED_SOCKET

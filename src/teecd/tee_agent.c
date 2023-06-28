@@ -105,6 +105,7 @@ int ProcessAgentInit(void)
 {
     int index;
     int index2;
+
     for (index = 0; index < g_agentNum; index++) {
         if (g_agentOps[index].agentInit != NULL) {
             if (g_agentOps[index].agentInit() != 0) {

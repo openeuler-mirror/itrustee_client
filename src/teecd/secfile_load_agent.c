@@ -35,32 +35,7 @@ static pthread_t g_secLoadThread = ULONG_MAX;
 
 int GetSecLoadAgentFd(void)
 {
-	return g_secLoadAgentFd;
-}
-
-void *GetSecLoadAgentControl(void)
-{
-	return g_secLoadAgentControl;
-}
-
-int SecLoadAgentInit(void)
-{
-	g_secLoadAgentFd = AgentInit(SECFILE_LOAD_AGENT_ID, (void **)(&g_secLoadAgentControl));
-	if (g_secLoadAgentFd < 0) {
-		tloge("secfile load agent init failed\n");
-		return -1;
-	}
-	return 0;
-}
-
-void SecLoadAgentThreadCreate(void)
-{
-	(void)pthread_create(&g_secLoadThread, NULL, SecfileLoadAgentThread, g_secLoadAgentControl);
-}
-
-void SecLoadAgentThreadJoin(void)
-{
-	(void)pthread_join(g_secLoadThread, NULL);
+    return g_secLoadAgentFd;
 }
 
 void *GetSecLoadAgentControl(void)

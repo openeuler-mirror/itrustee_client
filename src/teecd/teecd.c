@@ -79,7 +79,7 @@ int main(void)
     (void)pthread_create(&caDaemonThread, NULL, CaServerWorkThread, NULL);
 
     /*
-     * register our signal handle, catch signal which default action is exit
+     * register our signal handler, catch signal which default action is exit
      */
     /* ignore SIGPIPE(happened when CA created socket then be killed),teecd will not restart. */
     (void)signal(SIGPIPE, SIG_IGN);

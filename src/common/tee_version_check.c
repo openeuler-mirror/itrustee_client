@@ -11,6 +11,7 @@
  */
 
 #include "tee_version_check.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -56,6 +57,7 @@ static int GetTEEInfo(void)
         tloge("Failed to get tee info, err=%d\n", ret);
         return -1;
     }
+
     return ret;
 }
 

@@ -37,7 +37,7 @@ install-container:
 	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_AGENTD) /usr/bin
 	[ ! -d "/usr/lib64" ] && mkdir -p /usr/lib64 || true
 	cp -f $(TARGET_DIR)/$(TARGET_LIB) /usr/lib64 # only for secgear
-	if [ -d "lib/aarch64-linux-gnu" ]; then \
+	if [ -d "/lib/aarch64-linux-gnu" ]; then \
 		cp -f $(TARGET_DIR)/$(TARGET_LIB) /lib/aarch64-linux-gnu; \
 		cp -f $(TARGET_DIR)/$(TARGET_LIBSEC) /lib/aarch64-linux-gnu; \
 	elif [ -d "/usr/local/lib" ]; then \

@@ -92,7 +92,7 @@ static int SendFileDescriptor(int cmd, int socket, int fd)
     }
     /* Pass teecd version to libteec */
     iov[0].iov_base = &base;
-    iov[0].iov_len  = sizeof(base);
+    iov[0].iov_len = sizeof(base);
 
     ret = InitMsg(&hmsg, iov, IOV_LEN, ctrlBuf, CMSG_SPACE(sizeof(int)));
     if (ret != EOK) {
@@ -321,14 +321,6 @@ static int32_t CreateSocket(void)
     }
 #endif
 
-#ifdef CONFIG_PATH_NAMED_SOCKET
-	if (PrepareSocketEnv() != 0) {
-		tloge("prepare socket environment failed\n");
-		(void)close(s);
-		return -1;
-	}
-#endif
-
     ret = FormatSockAddr(&local, &len);
     if (ret != EOK) {
         tloge("format sock addr failed\n");
@@ -345,7 +337,7 @@ static int32_t CreateSocket(void)
 #ifdef CONFIG_PATH_NAMED_SOCKET
     /* Change socket path permission to srw-rw-rw- */
     ret = chmod(TC_NS_SOCKET_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-    if(ret < 0) {
+    if (ret < 0) {
         tloge("change socket permission failed, errno=%d\n", errno);
         (void)close(s);
         (void)unlink(TC_NS_SOCKET_NAME);
