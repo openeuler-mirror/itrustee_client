@@ -27,46 +27,46 @@
 
 enum TeleportArgType {
     TP_INSTALL,
-	TP_IMPORT,
-	TP_TYPE,
-	TP_CREATE,
-	TP_RUN,
-	TP_ID,
-	TP_INPUT,
-	TP_OUTPUT,
-	TP_RENAME,
-	TP_SAVE,
-	TP_PARAM,
-	TP_DELETE,
-	TP_QUERY,
-	TP_DESTROY,
-	TP_UNINSTALL,
-	TP_LIST,
-	TP_HELP,
-	TP_TYPE_MAX,
+    TP_IMPORT,
+    TP_TYPE,
+    TP_CREATE,
+    TP_RUN,
+    TP_ID,
+    TP_INPUT,
+    TP_OUTPUT,
+    TP_RENAME,
+    TP_SAVE,
+    TP_PARAM,
+    TP_DELETE,
+    TP_QUERY,
+    TP_DESTROY,
+    TP_UNINSTALL,
+    TP_LIST,
+    TP_HELP,
+    TP_TYPE_MAX,
 };
 
 struct TeeTeleportArgs {
-	bool cmd[TP_TYPE_MAX];
+    bool cmd[TP_TYPE_MAX];
     char installPath[PATH_MAX];
-	char importPath[PATH_MAX];
-	char typeParam[PATH_MAX];
-	char createPath[PATH_MAX];
-	char runPath[PATH_MAX];
-	char idPath[PATH_MAX];
-	char inputPath[PATH_MAX];
-	char outputPath[PATH_MAX];
-	char renamePath[PATH_MAX];
-	char savePath[PATH_MAX];
-	char paramVal[PARAM_LEN_MAX];
-	char deletePath[PATH_MAX];
-	char queryPath[PATH_MAX];
+    char importPath[PATH_MAX];
+    char typeParam[PATH_MAX];
+    char createPath[PATH_MAX];
+    char runPath[PATH_MAX];
+    char idPath[PATH_MAX];
+    char inputPath[PATH_MAX];
+    char outputPath[PATH_MAX];
+    char renamePath[PATH_MAX];
+    char savePath[PATH_MAX];
+    char paramVal[PARAM_LEN_MAX];
+    char deletePath[PATH_MAX];
+    char queryPath[PATH_MAX];
 };
 
 struct TeeTeleportFunc {
-	enum TeleportArgType type;
-	int32_t (*func)(const struct TeeTeleportArgs *args, uint32_t sessionID);
-	bool needId;
+    enum TeleportArgType type;
+    int32_t (*func)(const struct TeeTeleportArgs *args, uint32_t sessionID);
+    bool needId;
 };
 
 #endif

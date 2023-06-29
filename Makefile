@@ -53,7 +53,7 @@ install-container:
 LIB_CFLAGS := $(COMMON_CFLAGS) -DSEC_STORAGE_DATA_KUNPENG_PATH -DCONFIG_KUNPENG_PLATFORM -DCONFIG_AUTH_USERNAME -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\"
 LIB_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/authentication/
 LIB_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIC -D_FORTIFY_SOURCE=2 -O2
-LIB_LDFLAGS := -lboundscheck -Llibboundscheck/lib -shared
+LIB_LDFLAGS += -lboundscheck -Llibboundscheck/lib -shared
 
 LIB_SOURCES := src/libteec_vendor/tee_client_api.c \
                src/libteec_vendor/tee_client_ext_api.c \
@@ -135,7 +135,7 @@ AGENTD_CFLAGS += -DDYNAMIC_TA_PATH=\"/var/itrustee/ta/\" -DCONFIG_CUSTOM_LOGGING
 AGENTD_CFLAGS += -Iinclude -Iinclude/cloud -Iext_include -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/teecd/
 AGENTD_CFLAGS += -Isrc/authentication/ -Isrc/libteec_vendor/ -Isrc/common
 AGENTD_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
-AGENTD_LDFLAGS += $(LD_FLAGS) -lboundscheck -Llibboundscheck/lib -lpthread -lcrypto
+AGENTD_LDFLAGS += $(LD_CFLAGS) -lboundscheck -Llibboundscheck/lib -lpthread -lcrypto
 ifneq ($(strip $(CFG_ENG)), user)
 AGENTD_CFLAGS += -DDEF_ENG
 endif
@@ -189,7 +189,7 @@ TEE_TELEPORT_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,
 TEE_TELEPORT_CFLAGS += -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
 TEE_TELEPORT_CFLAGS += -Iinclude -Iinclude/cloud -Isrc/libteec_vendor -Iext_include
 TEE_TELEPORT_CFLAGS += -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/tee_teleport -Isrc/common
-TEE_TELEPORT_CFLAGS += DCONFIG_KUNPENG_PLATFORM -DCONFIG_TEE_TELEPORT_SUPPORT
+TEE_TELEPORT_CFLAGS += -DCONFIG_KUNPENG_PLATFORM -DCONFIG_TEE_TELEPORT_SUPPORT
 TEE_TELEPORT_LDFLAGS += $(LD_CFLAGS) -Llibboundscheck/lib -Loutput -lboundscheck -lteec -lpthread -lcrypto
 $(TARGET_TEE_TELEPORT): $(TARGET_LIBSEC) $(TARGET_LIB)
 	@echo "compile tee_teleport"
