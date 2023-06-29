@@ -10,16 +10,18 @@
  * See the Mulan PSL v2 for more details.
  */
 
-#ifndef TEE_VERSION_CHECK_H
-#define TEE_VERSION_CHECK_H
+#ifndef TEE_TB_SCP_H
+#define TEE_TB_SCP_H
 
-struct ModuleInfo {
-    const char *deviceName;
-    const char *moduleName;
-    unsigned long ioctlNum;
-};
+#include <stdint.h>
+#include <stdbool.h>
 
-void InitModuleInfo(struct ModuleInfo *info);
-int CheckTzdriverVersion(void);
+int TeeScp(int mode, const char *srcPath, const char *dstPath, const char *filename, uint32_t sessionID);
+int TeeInstall(int mode, const char *filename, uint32_t *sessionID);
+int TeeUninstall(int mode);
+int TeeList(int mode);
+int TeeDelete(const char *filename, uint32_t sessionID);
+int TeeQuery(const char *filename, uint32_t sessionID, bool *exist);
+int TeeDestroy(uint32_t sessionID);
 
 #endif

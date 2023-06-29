@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -1055,7 +1055,7 @@ static int32_t CopyFile(const char *fromPath, const char *toPath)
 
     int32_t ret = fstat(fromFd, &fromStat);
     if (ret == -1) {
-        tloge("stat_file failed: %d\n", errno);
+        tloge("stat file failed: %d\n", errno);
         close(fromFd);
         return ret;
     }

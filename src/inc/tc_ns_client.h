@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2012-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2012-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -153,6 +153,10 @@ struct AgentIoctlArgs {
 #define TC_NS_CLIENT_IOCTL_GET_TEE_VERSION                _IOWR(TC_NS_CLIENT_IOC_MAGIC, 21, unsigned int)
 #ifdef CONFIG_CMS_SIGNATURE
 #define TC_NS_CLIENT_IOCTL_UPDATE_TA_CRL                  _IOWR(TC_NS_CLIENT_IOC_MAGIC, 22, struct TC_NS_ClientCrl)
+#endif
+#ifdef CONFIG_TEE_TELEPORT_SUPPORT
+#define TC_NS_CLIENT_IOCTL_PORTAL_REGISTER                _IOWR(TC_NS_CLIENT_IOC_MAGIC, 24, struct AgentIoctlArgs)
+#define TC_NS_CLIENT_IOCTL_PORTAL_WORK                    _IOWR(TC_NS_CLIENT_IOC_MAGIC, 25, struct AgentIoctlArgs)
 #endif
 #define TC_NS_CLIENT_IOCTL_GET_TEE_INFO                   _IOWR(TC_NS_CLIENT_IOC_MAGIC, 26, TC_NS_TEE_Info)
 

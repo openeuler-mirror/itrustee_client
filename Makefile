@@ -4,6 +4,7 @@ TARGET_DIR := dist
 LIBC_SEC   := libboundscheck
 TARGET_LOG := tlogcat
 TARGET_LIBSEC := libboundscheck.so
+TARGET_TEE_TELEPORT := tee_teleport
 TARGET_AGENTD := agentd
 WITH_CONFIDENTIAL_CONTAINER ?= true
 
@@ -21,12 +22,13 @@ endif
 export CC
 export LD
 
-all: $(TARGET_LIBSEC) $(TARGET_LIB) $(TARGET_APP) $(TARGET_LOG) $(TARGET_AGENTD)
+all: $(TARGET_LIBSEC) $(TARGET_LIB) $(TARGET_APP) $(TARGET_LOG) $(TARGET_TEE_TELEPORT) $(TARGET_AGENTD)
 	@cd $(LIBC_SEC) && $(MAKE) clean
 
 install:
 	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_APP) /usr/bin
 	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_LOG) /usr/bin
+	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_TEE_TELEPORT) /usr/bin
 	[ ! -d "/usr/lib64" ] && mkdir -p /usr/lib64 || true
 	cp -f $(TARGET_DIR)/$(TARGET_LIB) /usr/lib64  # only for secgear
 	[ -d "/lib64" ] && cp -f $(TARGET_DIR)/$(TARGET_LIB) /lib64
@@ -34,6 +36,7 @@ install:
 
 install-container:
 	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_LOG) /usr/bin
+	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_TEE_TELEPORT) /usr/bin
 	[ -d "/usr/bin" ] && cp -f $(TARGET_DIR)/$(TARGET_AGENTD) /usr/bin
 	[ ! -d "/usr/lib64" ] && mkdir -p /usr/lib64 || true
 	cp -f $(TARGET_DIR)/$(TARGET_LIB) /usr/lib64 # only for secgear
@@ -167,6 +170,33 @@ $(TARGET_LOG): $(TARGET_LIBSEC) $(LOG_SOURCES)
 	@mkdir -p $(TARGET_DIR)
 	@mv tlogcat $(TARGET_DIR)
 	@echo "after compile tlogcat"
+
+clean:
+	@cd $(LIBC_SEC) && $(MAKE) clean
+	@rm -rf $(TARGET_DIR)
+
+#############################
+## tee_teleport
+#############################
+TEE_TELEPORT_SOURCES := src/tee_teleport/tee_teleport.c \
+						src/tee_teleport/scp.c \
+						src/tee_teleport/portal.c \
+						src/tee_teleport/run.c \
+						src/common/dir.c \
+						src/common/tee_version_check.c
+
+TEE_TELEPORT_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack
+TEE_TELEPORT_CFLAGS += -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
+TEE_TELEPORT_CFLAGS += -Iinclude -Iinclude/cloud -Isrc/libteec_vendor -Iext_include
+TEE_TELEPORT_CFLAGS += -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/tee_teleport -Isrc/common
+TEE_TELEPORT_CFLAGS += DCONFIG_KUNPENG_PLATFORM -DCONFIG_TEE_TELEPORT_SUPPORT
+TEE_TELEPORT_LDFLAGS += $(LD_CFLAGS) -Llibboundscheck/lib -Loutput -lboundscheck -lteec -lpthread -lcrypto
+$(TARGET_TEE_TELEPORT): $(TARGET_LIBSEC) $(TARGET_LIB)
+	@echo "compile tee_teleport"
+	@$(CC) $(TEE_TELEPORT_CFLAGS) -o $@ $(TEE_TELEPORT_SOURCES) $(TEE_TELEPORT_LDFLAGS)
+	@mkdir -p $(TARGET_DIR)
+	@mv $(TARGET_TEE_TELEPORT) $(TARGET_DIR)
+	@echo "after compile tee_teleport"
 
 clean:
 	@cd $(LIBC_SEC) && $(MAKE) clean
