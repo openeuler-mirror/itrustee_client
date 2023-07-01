@@ -99,7 +99,6 @@ APP_SOURCES := src/teecd/teecd.c \
 			   src/teecd/misc_work_agent.c \
 			   src/teecd/tee_ca_auth.c \
 			   src/teecd/system_ca_auth.c \
-			   src/teecd/tee_ca_hashfile.c \
 			   src/authentication/tee_get_native_cert.c \
 			   src/authentication/tee_auth_common.c \
 			   src/teecd/tee_load_dynamic.c \
