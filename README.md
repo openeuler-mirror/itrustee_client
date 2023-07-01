@@ -1,9 +1,11 @@
 # client
 
 #### 介绍
-该目录下文件包含3个功能组件，分别是:libteec.so、teecd、tlogcat.
+该目录下文件包含5个功能组件，分别是:libteec.so、teecd、tlogcat、tee_teleport、agentd.
 libteec.so、teecd用于REE与TEE的通信,其中libteec.so是动态链接库，teecd是可执行文件;
 tlogcat 用于日志输出存储。
+tee_teleport 用于高级语言功能。
+agentd 用于容器中安全存储等功能的使用。
 
 
 #### 编译依赖
@@ -19,17 +21,19 @@ libteec_vendor
 
 
 #### 构建方法
-同时编译3个组件，运行命令
+同时编译5个组件，运行命令
 ```
 make
 ```
-生成可执行文件teecd、tlogcat，动态库libteec.so，存放在新创建的dist目录下。
+生成可执行文件teecd，tlogcat，动态库libteec.so，tee_teleport，agentd，存放在新创建的dist目录下。
 
 只编译某一个组件，运行命令
 ```
 make libteec.so
 make teecd
 make tlogcat
+make agentd
+make tee_teleport
 ```
 编译的同时，会生成一个动态库 libboundscheck.so，
 所有新生成的文件，都存放在新创建的dist目录下。

@@ -1,9 +1,11 @@
 # client
 
 #### Description
-There are 3 modules in the directory: libteec.so、teecd、tlogcat.
+There are 5 modules in the directory: libteec.so, teecd, tlogcat, tee_teleport, agentd.
 libteec.so & teecd are used in comunications between REE & TEE,
 tlogcat is used for saving logs.
+tee_teleport is used to support high-level language.
+agentd is used to support secure storage in container.
 
 #### Depend on
 These modules depend on open source libboundscheck, please download it here:
@@ -17,7 +19,7 @@ libteec_vendor
           |--- ...
 
 #### Build
-compile all 3 files, do like this
+compile all 5 files, do like this
 ```
 make
 ```
@@ -27,6 +29,8 @@ if only need one file, compile like this
 make libteec.so
 make teecd
 make tlogcat
+make agentd
+make tee_teleport
 ```
 at the same time, we can get a library libboundscheck.so.
 All the generated files are stored in the newly created directory dist.
