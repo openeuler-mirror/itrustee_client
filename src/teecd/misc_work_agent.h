@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -16,6 +16,7 @@
 
 #define WIDEVINE_NV_WVLOCK_SIZE   68
 #define MISC_CONTROL_TIME_STR_LEN 30
+#define AGENT_MISC_ID 0x4d495343
 
 typedef enum {
     SEC_NV_INFO, /* bootloaderlock status in nv partition */
@@ -40,5 +41,12 @@ struct MiscControlType {
 };
 
 void *MiscWorkThread(void *control);
+int GetMiscAgentFd(void);
+void *GetMiscAgentControl(void);
+
+int MiscAgentInit(void);
+void MiscAgentThreadCreate(void);
+void MiscAgentThreadJoin(void);
+void MiscAgentExit(void);
 
 #endif

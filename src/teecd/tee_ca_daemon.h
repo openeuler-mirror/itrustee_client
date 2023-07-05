@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2012-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2012-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -22,8 +22,6 @@
 #define SEC_STORAGE_DATA_USERS  USER_DATA_DIR"sec_storage_data_users/"
 #define SEC_STORAGE_DATA_USER_0 USER_DATA_DIR"sec_storage_data_users/0"
 #define SEC_STORAGE_DATA_DIR    USER_DATA_DIR"sec_storage_data/"
-
-#define TRANS_BUFF_SIZE (4 * 1024) /* agent transfer share buffer size */
 
 #define ROOT_DIR "/"
 #define SEC_STORAGE_ROOT_DIR      ROOT_DIR SFS_PARTITION_PERSISTENT
@@ -62,5 +60,6 @@ enum MuMsgUserid {
 
 void *CaServerWorkThread(void *dummy);
 int GetTEEVersion(void);
+int TeecdCheckTzdriverVersion(void);
 
 #endif

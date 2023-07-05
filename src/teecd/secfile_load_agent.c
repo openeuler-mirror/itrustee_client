@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2019-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2019-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -12,28 +12,64 @@
 
 #include "secfile_load_agent.h"
 #include <errno.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <limits.h>
 #include <sys/prctl.h>
 #include <linux/limits.h>
 #include "securec.h"
 #include "tc_ns_client.h"
 #include "tee_load_sec_file.h"
+#include "tee_agent.h"
 
 #define MAX_PATH_LEN 256
 #ifdef LOG_TAG
 #undef LOG_TAG
 #endif
 #define LOG_TAG "teecd_agent"
-#define H_OFFSET 32
-int g_secLoadAgentFd = -1;
+
+/* agentfd & agent control */
+static int g_secLoadAgentFd = -1;
+static struct SecAgentControlType *g_secLoadAgentControl = NULL;
+static pthread_t g_secLoadThread = ULONG_MAX;
 
 int GetSecLoadAgentFd(void)
 {
     return g_secLoadAgentFd;
 }
 
-void SetSecLoadAgentFd(int secLoadAgentFd)
+void *GetSecLoadAgentControl(void)
 {
-    g_secLoadAgentFd = secLoadAgentFd;
+    return g_secLoadAgentControl;
+}
+
+int SecLoadAgentInit(void)
+{
+    g_secLoadAgentFd = AgentInit(SECFILE_LOAD_AGENT_ID, (void **)(&g_secLoadAgentControl));
+    if (g_secLoadAgentFd < 0) {
+        tloge("secfile load agent init failed\n");
+        return -1;
+    }
+    return 0;
+}
+
+void SecLoadAgentThreadCreate(void)
+{
+    (void)pthread_create(&g_secLoadThread, NULL, SecfileLoadAgentThread, g_secLoadAgentControl);
+}
+
+void SecLoadAgentThreadJoin(void)
+{
+    (void)pthread_join(g_secLoadThread, NULL);
+}
+
+void SecLoadAgentExit(void)
+{
+    if (g_secLoadAgentFd >= 0) {
+        AgentExit(SECFILE_LOAD_AGENT_ID, g_secLoadAgentFd);
+        g_secLoadAgentFd = -1;
+        g_secLoadAgentControl = NULL;
+    }
 }
 
 static int32_t SecFileLoadWork(int tzFd, const char *filePath, enum SecFileType fileType, const TEEC_UUID *uuid)

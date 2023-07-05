@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2012-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2012-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -18,16 +18,25 @@
 #include <sys/mman.h>  /* for mmap */
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/types.h>
+#include <string.h>
 #include <pthread.h>
 #include "securec.h"
 #include "tc_ns_client.h"
 #include "tee_client_type.h"
+#include "tee_client_version.h"
 #include "tee_client_socket.h"
 #include "tee_agent.h"
 #include "tee_log.h"
 #include "tee_auth_common.h"
+#include "tee_version_check.h"
 #include "tee_ca_auth.h"
 #include "system_ca_auth.h"
+
+#ifdef CONFIG_PATH_NAMED_SOCKET
+#include <libgen.h>
+#include "dir.h"
+#endif
 
 /* debug switch */
 #ifdef LOG_NDEBUG
@@ -40,6 +49,11 @@
 
 #define IOV_LEN 1
 
+static struct ModuleInfo g_teecdModuleInfo = {
+    .deviceName = TC_TEECD_PRIVATE_DEV_NAME,
+    .moduleName = "teecd",
+    .ioctlNum = TC_NS_CLIENT_IOCTL_GET_TEE_INFO,
+};
 static unsigned int g_version = 0;
 
 static int InitMsg(struct msghdr *hmsg, struct iovec *iov, size_t iovLen,
@@ -62,7 +76,7 @@ static int SendFileDescriptor(int cmd, int socket, int fd)
     struct msghdr hmsg;
     struct iovec iov[IOV_LEN];
     char ctrlBuf[CMSG_SPACE(sizeof(int))];
-    char base[IOV_LEN];
+    RecvTeecdMsg base = { 0 };
     int *cmdata = NULL;
 
     errno_t ret = memset_s(&hmsg, sizeof(hmsg), 0, sizeof(hmsg));
@@ -76,10 +90,9 @@ static int SendFileDescriptor(int cmd, int socket, int fd)
         tloge("memset failed!\n");
         return ret;
     }
-    /* Pass at least one byte data, recvmsg() will not return 0 */
-    base[0]         = ' ';
-    iov[0].iov_base = base;
-    iov[0].iov_len  = sizeof(base);
+    /* Pass teecd version to libteec */
+    iov[0].iov_base = &base;
+    iov[0].iov_len = sizeof(base);
 
     ret = InitMsg(&hmsg, iov, IOV_LEN, ctrlBuf, CMSG_SPACE(sizeof(int)));
     if (ret != EOK) {
@@ -97,8 +110,12 @@ static int SendFileDescriptor(int cmd, int socket, int fd)
     }
 
     if (cmd == GET_TEEVERSION) {
-        iov[0].iov_base        = &fd;
-        iov[0].iov_len         = sizeof(int);
+        base.teeMaxApiLevel    = fd;
+        hmsg.msg_control       = NULL;
+        hmsg.msg_controllen    = 0;
+    } else if (cmd == GET_TEECD_VERSION) {
+        base.majorVersion      = TEEC_CLIENT_VERSION_MAJOR_SELF;
+        base.minorVersion      = TEEC_CLIENT_VERSION_MINOR_SELF;
         hmsg.msg_control       = NULL;
         hmsg.msg_controllen    = 0;
     }
@@ -115,7 +132,7 @@ static int ProcessCaMsg(const struct ucred *cr, const CaRevMsg *caInfo, int sock
 {
     int ret;
 
-    if (caInfo->cmd == GET_TEEVERSION) {
+    if (caInfo->cmd == GET_TEEVERSION || caInfo->cmd == GET_TEECD_VERSION) {
         ret = SendFileDescriptor(caInfo->cmd, socket, (int)g_version);
         if (ret != 0) {
             tloge("Failed to send version back. ret = %d\n", ret);
@@ -133,17 +150,17 @@ static int ProcessCaMsg(const struct ucred *cr, const CaRevMsg *caInfo, int sock
     ret = SendLoginInfo(cr, caInfo, fd);
     if (ret != EOK) {
         tloge("Failed to send login info. ret=%d\n", ret);
-        close(fd);
+        (void)close(fd);
         return -1;
     }
 
     ret = SendFileDescriptor(caInfo->cmd, socket, fd);
     if (ret != EOK) {
         tloge("Failed to send fd. ret=%d\n", ret);
-        close(fd);
+        (void)close(fd);
         return -1;
     }
-    close(fd);
+    (void)close(fd);
     return 0;
 }
 
@@ -154,6 +171,7 @@ static void ProcessAccept(int s, CaRevMsg *caInfo)
     int ret;
 
     while (1) {
+        /* int done, n; */
         tlogd("Waiting for a connection...target daemon\n");
         size_t t = sizeof(remote);
         int s2   = accept(s, (struct sockaddr *)&remote, (socklen_t *)&t);
@@ -165,7 +183,7 @@ static void ProcessAccept(int s, CaRevMsg *caInfo)
         socklen_t len = sizeof(struct ucred);
         if (getsockopt(s2, SOL_SOCKET, SO_PEERCRED, &cr, &len) < 0) {
             tloge("peercred failed: %d", errno);
-            close(s2);
+            (void)close(s2);
             continue;
         }
 
@@ -187,7 +205,7 @@ static void ProcessAccept(int s, CaRevMsg *caInfo)
 
     CLOSE_SOCKET:
         tlogd("close_socket and curret ret=%u\n", ret);
-        close(s2);
+        (void)close(s2);
         errno_t rc = memset_s(caInfo, sizeof(CaRevMsg), 0, sizeof(CaRevMsg));
         if (rc != EOK) {
             tloge("ca_info memset_s failed\n");
@@ -205,8 +223,11 @@ static int FormatSockAddr(struct sockaddr_un *local, socklen_t *len)
 
     local->sun_family = AF_UNIX;
     *len              = (socklen_t)(strlen(local->sun_path) + sizeof(local->sun_family));
+
+#ifndef CONFIG_PATH_NAMED_SOCKET
     /* Make the socket in the Abstract Domain(no path but everyone can connect) */
     local->sun_path[0] = 0;
+#endif
 
     return 0;
 }
@@ -222,14 +243,54 @@ int GetTEEVersion(void)
     }
 
     ret = ioctl(fd, TC_NS_CLIENT_IOCTL_GET_TEE_VERSION, &g_version);
-    close(fd);
+    (void)close(fd);
     if (ret != 0) {
-        tloge("Failed to get tee version, err=%d\n", ret);
+        tloge("Failed to get tee api version, err=%d\n", ret);
         return -1;
     }
 
     return ret;
 }
+
+int TeecdCheckTzdriverVersion(void)
+{
+    InitModuleInfo(&g_teecdModuleInfo);
+    return CheckTzdriverVersion();
+}
+
+#ifdef CONFIG_PATH_NAMED_SOCKET
+static int PrepareSocketEnv(void)
+{
+    /* Create socket folder when it no exists */
+    int ret;
+
+    char *sockFilePath = strdup(TC_NS_SOCKET_NAME);
+    if (sockFilePath == NULL) {
+        tloge("failed to get socket file path\n");
+        return -1;
+    }
+
+    char *folder = dirname(sockFilePath);
+    ret = MkdirIteration(folder);
+    if (ret != 0) {
+        tloge("failed to create socket folder\n");
+        free(sockFilePath);
+        return -1;
+    }
+
+    /* Unlink socket path when it exists */
+    if (access(TC_NS_SOCKET_NAME, F_OK) == 0) {
+        ret = unlink(TC_NS_SOCKET_NAME);
+        if (ret != 0) {
+            tloge("failed to unlink socket file\n");
+            free(sockFilePath);
+            return -1;
+        }
+    }
+    free(sockFilePath);
+    return 0;
+}
+#endif
 
 static int32_t CreateSocket(void)
 {
@@ -248,22 +309,41 @@ static int32_t CreateSocket(void)
     ret = memset_s(&local, sizeof(local), 0, sizeof(local));
     if (ret != EOK) {
         tloge("memset_s sockaddr_un local failed!\n");
-        close(s);
+        (void)close(s);
         return -1;
     }
+
+#ifdef CONFIG_PATH_NAMED_SOCKET
+    if (PrepareSocketEnv() != 0) {
+        tloge("prepare socket environment failed\n");
+        (void)close(s);
+        return -1;
+    }
+#endif
 
     ret = FormatSockAddr(&local, &len);
     if (ret != EOK) {
         tloge("format sock addr failed\n");
-        close(s);
+        (void)close(s);
         return -1;
     }
 
     if (bind(s, (struct sockaddr *)&local, len) < 0) {
         tloge("bind() to server socket failed, errno=%d\n", errno);
-        close(s);
+        (void)close(s);
         return -1;
     }
+
+#ifdef CONFIG_PATH_NAMED_SOCKET
+    /* Change socket path permission to srw-rw-rw- */
+    ret = chmod(TC_NS_SOCKET_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    if (ret < 0) {
+        tloge("change socket permission failed, errno=%d\n", errno);
+        (void)close(s);
+        (void)unlink(TC_NS_SOCKET_NAME);
+        return -1;
+    }
+#endif
 
     return s;
 }
@@ -304,6 +384,11 @@ void *CaServerWorkThread(void *dummy)
     tlogv("\n********* deamon process_accept over!***\n");
 
 CLOSE_EXIT:
-    close(s);
+    (void)close(s);
+#ifdef CONFIG_PATH_NAMED_SOCKET
+    if (access(TC_NS_SOCKET_NAME, F_OK) == 0) {
+        (void)unlink(TC_NS_SOCKET_NAME);
+    }
+#endif
     return NULL;
 }

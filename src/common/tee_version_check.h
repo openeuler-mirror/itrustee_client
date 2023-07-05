@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2023. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2023-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -9,17 +9,17 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
-#ifndef LIBTEEC_TEE_AGENT_H
-#define LIBTEEC_TEE_AGENT_H
 
-#define TRANS_BUFF_SIZE (4 * 1024) /* agent transfer share buffer size */
+#ifndef TEE_VERSION_CHECK_H
+#define TEE_VERSION_CHECK_H
 
-int AgentInit(unsigned int id, void **control);
-void AgentExit(unsigned int id, int fd);
-int ProcessAgentInit(void);
-void ProcessAgentThreadCreate(void);
-void ProcessAgentThreadJoin(void);
-void ProcessAgentExit(void);
-void TrySyncSysTimeToSecure(void);
+struct ModuleInfo {
+    const char *deviceName;
+    const char *moduleName;
+    unsigned long ioctlNum;
+};
+
+void InitModuleInfo(struct ModuleInfo *info);
+int CheckTzdriverVersion(void);
 
 #endif

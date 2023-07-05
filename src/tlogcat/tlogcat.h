@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2019-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2019-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -18,23 +18,30 @@
 #ifdef LOG_TEEOS_TAG
 #undef LOG_TEEOS_TAG
 #endif
-#define LOG_TEEOS_TAG      "teeos"
-#define LOG_ITEM_MAX_LEN   1024
-#define LEVEL_ERROR        0
-#define LEVEL_WARNING      1
-#define LEVEL_INFO         2
-#define LEVEL_DEBUG        3
-#define LEVEL_VERBO        4
-#define TOTAL_LEVEL_NUMS   5
-#define LOG_FILE_INDEX_MAX 4U
+#define LOG_TEEOS_TAG               "teeos"
 
-#define NEVER_USED_LEN     32U
-#define TEE_UUID_LEN       16U
-#define ITEM_RESERVED_LEN  1U
+#define TC_LOGGER_DEV_NAME          "/dev/teelog"
+
+#define LOG_ITEM_MAX_LEN            1024
+
+#define LEVEL_ERROR                 0
+#define LEVEL_WARNING               1
+#define LEVEL_INFO                  2
+#define LEVEL_DEBUG                 3
+#define LEVEL_VERBO                 4
+
+#define TOTAL_LEVEL_NUMS            6
+
+#define LOG_FILE_INDEX_MAX          4U
+
+#define NEVER_USED_LEN              28U
+#define TEE_UUID_LEN                16U
+#define ITEM_RESERVED_LEN           1U
 
 /* 64 byte head + user log */
 struct LogItem {
     uint8_t neverUsed[NEVER_USED_LEN];
+    uint32_t nsid;
     uint16_t magic;
     uint16_t reserved0;
     uint32_t serialNo;

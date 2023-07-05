@@ -23,9 +23,9 @@ void FreeTagNode(void);
 #else
 static inline void JudgeLogTag(const struct LogItem *logItem, bool isTa, const char **logTag)
 {
-	(void)logItem;
-	(void)isTa;
-	(void)logTag;
+    (void)logItem;
+    (void)isTa;
+    (void)logTag;
 }
 static inline void FreeTagNode(void)
 {

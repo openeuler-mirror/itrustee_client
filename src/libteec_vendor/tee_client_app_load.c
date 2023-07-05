@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2013-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2013-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -189,7 +189,7 @@ static int32_t TEEC_DoReadApp(FILE *fp, TC_NS_ClientContext *cliContext)
     /* get magic-num & version-num */
     int32_t ret = TEEC_GetImageLenth(fp, &totalImgLen);
     if (ret != 0) {
-        tloge("get image lenth fail\n");
+        tloge("get image length fail\n");
         return -1;
     }
 

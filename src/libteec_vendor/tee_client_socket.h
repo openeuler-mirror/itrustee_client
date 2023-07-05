@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -15,7 +15,11 @@
 #include <stdint.h>
 #include "tee_auth_common.h"
 
+#ifdef CONFIG_PATH_NAMED_SOCKET
+#define TC_NS_SOCKET_NAME        CONFIG_PATH_NAMED_SOCKET
+#else
 #define TC_NS_SOCKET_NAME        "#tc_ns_socket"
+#endif
 
 int CaDaemonConnectWithCaInfo(const CaAuthInfo *caInfo, int cmd, const TEEC_XmlParameter *halXmlPtr);
 

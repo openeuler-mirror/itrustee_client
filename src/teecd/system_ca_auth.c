@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <sys/ioctl.h> /* for ioctl */
 #include <sys/socket.h>
+#include <fcntl.h>
 #include "securec.h"
 #include "tc_ns_client.h"
 #include "tee_client_type.h"

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -18,8 +18,8 @@
 #include "tee_log.h"
 #include "tc_ns_client.h"
 
-#define SECFILE_LOAD_AGENT_ID 0x4c4f4144 // SECFILE-LOAD-AGENT
 #define MAX_SEC_FILE_NAME_LEN 32
+#define SECFILE_LOAD_AGENT_ID 0x4c4f4144
 
 typedef enum {
     LOAD_TA_SEC = 0,
@@ -48,7 +48,12 @@ struct SecAgentControlType {
 };
 
 void *SecfileLoadAgentThread(void *control);
+
 int GetSecLoadAgentFd(void);
-void SetSecLoadAgentFd(int secLoadAgentFd);
+void *GetSecLoadAgentControl(void);
+int SecLoadAgentInit(void);
+void SecLoadAgentThreadCreate(void);
+void SecLoadAgentThreadJoin(void);
+void SecLoadAgentExit(void);
 
 #endif

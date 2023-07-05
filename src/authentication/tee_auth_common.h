@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2018-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2018-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -60,6 +60,14 @@ typedef struct {
     uint8_t xmlBuffer[HASH_FILE_MAX_SIZE];
 } CaRevMsg;
 
+typedef union {
+    int teeMaxApiLevel;
+    struct {
+        uint16_t majorVersion;
+        uint16_t minorVersion;
+    };
+} RecvTeecdMsg;
+
 typedef struct {
     uint32_t fileSize;                      /* xml file size */
     uint8_t fileBuf[HASH_FILE_MAX_SIZE];    /* read xml file data to this buffer */
@@ -71,7 +79,7 @@ typedef struct {
 
 int TeeGetPkgName(int caPid, char *path, size_t pathLen);
 
-int TeeGetUserName(unsigned int caUid, char *userName, size_t nameLen);
+int TeeGetUserName(int caPid, unsigned int caUid, char *userName, size_t nameLen);
 
 int TeeCheckHidlAuth(unsigned int uid, int pid);
 

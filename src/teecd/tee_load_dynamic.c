@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2023. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -43,11 +43,6 @@ static int32_t LoadOneFile(const char *dynDir, const struct dirent *dirFile, int
     char name[MAX_FILE_NAME_LEN];
     FILE *fp = NULL;
     int32_t ret = -1;
-
-    if (strcmp(dirFile->d_name, ".") == 0 || strcmp(dirFile->d_name, "..") == 0) {
-        tlogd("no need to load\n");
-        goto END;
-    }
 
     if (strstr(dirFile->d_name, ".sec") == NULL) {
         tloge("only support sec file\n");
@@ -97,6 +92,10 @@ static void LoadOneDynamicDir(int32_t fd, const char *dynDir, uint32_t loadType)
         return;
     }
     while ((dirFile = readdir(dir)) != NULL) {
+        if (dirFile->d_type != DT_REG) {
+            tlogd("no need to load\n");
+            continue;
+        }
         ret = LoadOneFile(dynDir, dirFile, fd, loadType);
         if (ret != 0) {
             tlogd("load dynamic failed\n");
