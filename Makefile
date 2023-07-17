@@ -189,7 +189,7 @@ TEE_TELEPORT_CFLAGS += -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
 TEE_TELEPORT_CFLAGS += -Iinclude -Iinclude/cloud -Isrc/libteec_vendor -Iext_include
 TEE_TELEPORT_CFLAGS += -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/tee_teleport -Isrc/common
 TEE_TELEPORT_CFLAGS += -DCONFIG_KUNPENG_PLATFORM -DCONFIG_TEE_TELEPORT_SUPPORT
-TEE_TELEPORT_LDFLAGS += $(LD_CFLAGS) -Llibboundscheck/lib -Loutput -lboundscheck -lteec -lpthread -lcrypto
+TEE_TELEPORT_LDFLAGS += $(LD_CFLAGS) -Llibboundscheck/lib -L$(TARGET_DIR) -lboundscheck -lteec -lpthread -lcrypto
 $(TARGET_TEE_TELEPORT): $(TARGET_LIBSEC) $(TARGET_LIB)
 	@echo "compile tee_teleport"
 	@$(CC) $(TEE_TELEPORT_CFLAGS) -o $@ $(TEE_TELEPORT_SOURCES) $(TEE_TELEPORT_LDFLAGS)
