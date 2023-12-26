@@ -31,7 +31,7 @@
 #endif
 #define LOG_TAG "teecd"
 
-int AgentInit(unsigned int id, void **control)
+int AgentInit(unsigned int id, unsigned int bufferSize, void **control)
 {
     int ret;
     struct AgentIoctlArgs args = { 0 };
@@ -49,7 +49,7 @@ int AgentInit(unsigned int id, void **control)
         return -1;
     }
     args.id         = id;
-    args.bufferSize = TRANS_BUFF_SIZE;
+    args.bufferSize = bufferSize;
     ret             = ioctl(fd, TC_NS_CLIENT_IOCTL_REGISTER_AGENT, &args);
     if (ret != 0) {
         (void)close(fd);

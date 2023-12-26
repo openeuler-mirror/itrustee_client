@@ -12,9 +12,10 @@
 #ifndef LIBTEEC_TEE_AGENT_H
 #define LIBTEEC_TEE_AGENT_H
 
-#define TRANS_BUFF_SIZE (4 * 1024) /* agent transfer share buffer size */
+#define TRANS_BUFF_SIZE           (4 * 1024) /* agent transfer share buffer size */
+#define FS_TRANS_BUFF_SIZE_CCOS   (512 * 1024) /* agent transfer share buffer size on ccos */
 
-int AgentInit(unsigned int id, void **control);
+int AgentInit(unsigned int id, unsigned int bufferSize, void **control);
 void AgentExit(unsigned int id, int fd);
 int ProcessAgentInit(void);
 void ProcessAgentThreadCreate(void);

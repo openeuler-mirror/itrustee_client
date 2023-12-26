@@ -45,7 +45,7 @@ void *GetSecLoadAgentControl(void)
 
 int SecLoadAgentInit(void)
 {
-    g_secLoadAgentFd = AgentInit(SECFILE_LOAD_AGENT_ID, (void **)(&g_secLoadAgentControl));
+    g_secLoadAgentFd = AgentInit(SECFILE_LOAD_AGENT_ID, TRANS_BUFF_SIZE, (void **)(&g_secLoadAgentControl));
     if (g_secLoadAgentFd < 0) {
         tloge("secfile load agent init failed\n");
         return -1;
