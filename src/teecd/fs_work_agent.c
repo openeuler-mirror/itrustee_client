@@ -58,7 +58,27 @@ void *GetFsAgentControl(void)
 
 int FsAgentInit(void)
 {
-    g_fsAgentFd = AgentInit(AGENT_FS_ID, (void **)(&g_fsAgentControl));
+    int ret;
+    uint32_t bufferSize = TRANS_BUFF_SIZE;
+    uint32_t check_ccos = 0;
+
+#ifdef CONFIG_AGENTD
+    int fd = open(TC_NS_CVM_DEV_NAME, O_RDWR);
+#else
+    int fd = open(TC_TEECD_PRIVATE_DEV_NAME, O_RDWR);
+#endif
+    if (fd < 0) {
+        tloge("open tee client dev failed, fd is %d\n", fd);
+        return -1;
+    }
+
+    ret = ioctl(fd, TC_NS_CLIENT_IOCTL_CHECK_CCOS, &check_ccos);
+    if (ret == 0 && check_ccos != 0) {
+        bufferSize = FS_TRANS_BUFF_SIZE_CCOS;
+    }
+    (void)close(fd);
+
+    g_fsAgentFd = AgentInit(AGENT_FS_ID, bufferSize, (void **)(&g_fsAgentControl));
     if (g_fsAgentFd < 0) {
         tloge("fs agent init failed\n");
         return -1;

@@ -46,7 +46,7 @@ void *GetMiscAgentControl(void)
 
 int MiscAgentInit(void)
 {
-    g_miscAgentFd = AgentInit(AGENT_MISC_ID, (void **)(&g_miscAgentControl));
+    g_miscAgentFd = AgentInit(AGENT_MISC_ID, TRANS_BUFF_SIZE, (void **)(&g_miscAgentControl));
     if (g_miscAgentFd < 0) {
         tloge("misc agent init failed\n");
         return -1;
