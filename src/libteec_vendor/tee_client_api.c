@@ -73,6 +73,17 @@ void SetBit(uint32_t i, uint32_t byteMax, uint8_t *bitMap)
     bitMap[i >> SHIFT] |= (uint8_t)(1U << (i & MASK));
 }
 
+bool CheckBit(uint32_t i, uint32_t byteMax, const uint8_t *bitMap)
+{
+    if ((i >> SHIFT) >= byteMax) {
+        return false;
+    }
+    if (bitMap == NULL) {
+        return false;
+    }
+    return (bitMap[i >> SHIFT] & (uint8_t)(1U << (i & MASK))) != 0;
+}
+
 void ClearBit(uint32_t i, uint32_t byteMax, uint8_t *bitMap)
 {
     if ((i >> SHIFT) >= byteMax) {

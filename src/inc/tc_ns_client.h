@@ -122,6 +122,22 @@ struct SecLoadIoctlStruct {
     };
 }__attribute__((packed));
 
+#ifdef CROSS_DOMAIN_PERF
+enum PosixProxyShmType {
+    CTRL_TASKLET_BUFF = 1,
+    DATA_TASKLET_BUFF
+}
+
+struct PosixProxyIoctlArgs {
+    enum PosixProxyShmType shmType;
+    uint32_t bufferSize;
+    union {
+        void *buffer;
+        unsigned long long addr;
+    };
+};
+#endif
+
 struct AgentIoctlArgs {
     uint32_t id;
     uint32_t bufferSize;
@@ -157,6 +173,12 @@ struct AgentIoctlArgs {
 #ifdef CONFIG_TEE_TELEPORT_SUPPORT
 #define TC_NS_CLIENT_IOCTL_PORTAL_REGISTER                _IOWR(TC_NS_CLIENT_IOC_MAGIC, 24, struct AgentIoctlArgs)
 #define TC_NS_CLIENT_IOCTL_PORTAL_WORK                    _IOWR(TC_NS_CLIENT_IOC_MAGIC, 25, struct AgentIoctlArgs)
+
+#ifdef CROSS_DOMAIN_PERF
+#define TC_NS_CLIENT_IOCTL_POSIX_PROXY_REGISTER_TASKLET \
+	_IOWR(TC_NS_CLIENT_IOC_MAGIC, 27, struct PosixProxyIoctlArgs)
+#endif
+
 #endif
 #define TC_NS_CLIENT_IOCTL_GET_TEE_INFO                   _IOWR(TC_NS_CLIENT_IOC_MAGIC, 26, TC_NS_TEE_Info)
 #define TC_NS_CLIENT_IOCTL_CHECK_CCOS                     _IOWR(TC_NS_CLIENT_IOC_MAGIC, 32, unsigned int)
