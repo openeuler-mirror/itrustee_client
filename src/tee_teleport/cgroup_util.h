@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2023-2023. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024-2024. All rights reserved.
  * Licensed under the Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
@@ -10,16 +10,19 @@
  * See the Mulan PSL v2 for more details.
  */
 
-#ifndef TEE_TB_RUN_H
-#define TEE_TB_RUN_H
+#ifndef CGROUP_UTIL_H
+#define CGROUP_UTIL_H
 
-#include <stdint.h>
+#define ONLINE_CPU_MAX_LEN 1024 /* 256 cores as maximum specification */
+#define PARAM_LEN          64
 
-struct TeeRunParam {
-    uint32_t sessionID;
-    char *envParam; /* running environment variables */
+struct TeePortalRConfigType {
+    long vmid;
+    char cpus[PARAM_LEN];
+    char memSize[PARAM_LEN];
+    char cpuset[PARAM_LEN];
+    char diskSize[PARAM_LEN];
+    char onlineCpus[ONLINE_CPU_MAX_LEN];
 };
-
-int TeeRun(int program, int argc, char **argv, const struct TeeRunParam *runParam, int *retVal);
 
 #endif

@@ -15,13 +15,20 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "cgroup_util.h"
+
+struct TeePortalContainerType {
+    uint32_t nsid;
+    char containerid[PARAM_LEN];
+};
 
 int TeeScp(int mode, const char *srcPath, const char *dstPath, const char *filename, uint32_t sessionID);
 int TeeInstall(int mode, const char *filename, uint32_t *sessionID);
 int TeeUninstall(int mode);
 int TeeList(int mode);
-int TeeDelete(const char *filename, uint32_t sessionID);
-int TeeQuery(const char *filename, uint32_t sessionID, bool *exist);
 int TeeDestroy(uint32_t sessionID);
-
+int TeeDelete(uint32_t sessionID);
+int TeeSendContainerMsg(const struct TeePortalContainerType *config, uint32_t mode);
+int TeeClean(int grpId);
+int TeeRconfig(struct TeePortalRConfigType *config, long nsid);
 #endif
