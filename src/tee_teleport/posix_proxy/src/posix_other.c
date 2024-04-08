@@ -76,7 +76,7 @@ static long EpollCtlWork(struct PosixProxyParam *param)
     int ret = -1;
 
     if (DeSerialize(param->argsCnt, param->args, param->argsSz,
-        INTEGERTYPE, &fd, INTEGERTYPE, &op, INTEGERTYPE &fd2, POINTTYPE, &ev) != 0) {
+        INTEGERTYPE, &fd, INTEGERTYPE, &op, INTEGERTYPE, &fd2, POINTTYPE, &ev) != 0) {
         ERR("[%s] Deserialize failed\n", __FUNCTION__);
         goto end;
     }
@@ -164,7 +164,7 @@ static int InsertFirstPkg(struct FdList *fdList, int fd, atomic_ulong teeIndex,
     }
 
     if (blkSz > 0) {
-        ret = memcpy_s(pkgTmpBuf, blkSz data, blkSz);
+        ret = memcpy_s(pkgTmpBuf, blkSz, data, blkSz);
         if (ret != 0) {
             ERR("memcpy failed ret: %d\n", ret);
             free(pkgTmpBuf);
@@ -172,7 +172,7 @@ static int InsertFirstPkg(struct FdList *fdList, int fd, atomic_ulong teeIndex,
         }
     }
 
-    ret = FdListPutPkg(fdList, fd, teeIndex pkgTmpBuf, totalLen);
+    ret = FdListPutPkg(fdList, fd, teeIndex, pkgTmpBuf, totalLen);
     if (ret != 0) {
         ERR("put pkg tmpBuf to list failed\n");
         free(pkgTmpBuf);
@@ -190,14 +190,14 @@ static long PkgSendWork(struct PosixProxyParam *param)
 
     if (DeSerialize(param->argsCnt, param->args, param->argsSz,
         INTEGERTYPE, &fd, INTEGERTYPE, &teeIndex, INTEGERTYPE, &totalLen,
-        POINTTYPE, &data, POINTTYPE, &offset, INTEGERTYPE, &blkSz) != 0) {
+        POINTTYPE, &data, INTEGERTYPE, &offset, INTEGERTYPE, &blkSz) != 0) {
         ERR("[%s] Deserialize failed\n", __FUNCTION__);
         errno = EINVAL;
         return -1;
     }
 
     if (offset == 0) {
-        ret = InsertFirstPkg(fdList, fd teeIndex, data, blkSz, totalLen);
+        ret = InsertFirstPkg(fdList, fd, teeIndex, data, blkSz, totalLen);
         if (ret != 0) {
             ERR("PkgSendWork first pkg put failed\n");
             errno = EIO;
@@ -221,7 +221,7 @@ static long PkgSendWork(struct PosixProxyParam *param)
         goto end;
     }
 
-    if(pkg->buffLen - offset < blkSz) {
+    if (pkg->buffLen - offset < blkSz) {
         ERR("pkg exceeded temp buff len\n");
         errno = ERANGE;
         ret = -1;
@@ -248,7 +248,7 @@ static long PkgRecvWork(struct PosixProxyParam *param)
 
     if (DeSerialize(param->argsCnt, param->args, param->argsSz,
         INTEGERTYPE, &fd, INTEGERTYPE, &teeIndex, INTEGERTYPE, &totalLen,
-        POINTTYPE, &tmpBuf, POINTTYPE, &offset, INTEGERTYPE, &blkSz) != 0) {
+        POINTTYPE, &tmpBuf, INTEGERTYPE, &offset, INTEGERTYPE, &blkSz) != 0) {
         ERR("[%s] Deserialize failed\n", __FUNCTION__);
         errno = EINVAL;
         return -1;
@@ -269,7 +269,7 @@ static long PkgRecvWork(struct PosixProxyParam *param)
         goto end;
     }
 
-    if(memcpy_s(retBuf, param->argsSz, pkg->buff + offset, blkSz) != 0) {
+    if (memcpy_s(retBuf, param->argsSz, pkg->buff + offset, blkSz) != 0) {
         ERR("memcpy_s failed for expected results\n");
         errno = ERANGE;
         ret = -1;
@@ -305,7 +305,7 @@ static long PkgTerminateWork(struct PosixProxyParam *param)
     return ret;
 }
 
-static long GetInterfaceList(int fd, unsigned long req uint8_t *buf, uint64_t bufLen)
+static long GetInterfaceList(int fd, unsigned long req, uint8_t *buf, uint64_t bufLen)
 {
     long ret = -1;
     struct ifconf ifc = {0};
@@ -320,7 +320,7 @@ static long GetInterfaceList(int fd, unsigned long req uint8_t *buf, uint64_t bu
 
     if (len != NULL)
         ifc.ifc_len = *len;
-    
+
     ret = ioctl(fd, req, &ifc);
     *len = ifc.ifc_len;
     return ret;
@@ -355,13 +355,13 @@ static long IoctlWork(struct PosixProxyParam *param)
         case SIOCGIFBRDADDR:
         case SIOCGIFNETMASK:
         case SIOCGIFINDEX:
-        case SIOGCIFHWADDR:
+        case SIOCGIFHWADDR:
             ret = HandleInterfaceOpt((int)fd, (unsigned long)req, (struct ifreq *)buf);
             break;
         case FIONBIO:
         case FIONREAD:
             ret = ioctl((int)fd, (unsigned long)req, (int *)buf);
-            if (bug != NULL) {
+            if (buf != NULL) {
                 *(int *)param->args = *(int *)buf;
             }
             break;
@@ -379,7 +379,7 @@ static long IoctlWork(struct PosixProxyParam *param)
 
 static long Poll(struct PosixProxyParam *param)
 {
-    int ret = -1;
+    int ret = 0;
     uint64_t n = 0, timeout = 0;
     struct pollfd *fds = NULL;
 
@@ -401,7 +401,7 @@ static long Poll(struct PosixProxyParam *param)
 
 static long GetrlimitWork(struct PosixProxyParam *param)
 {
-    int ret = -1;
+    int ret = 0;
     uint64_t resource = 0;
     uint8_t *rlim = NULL;
 
@@ -430,7 +430,7 @@ static struct PosixFunc g_funcs[] = {
     POSIX_FUNC_ENUM(OTHER_PKG_TERMINATE, PkgTerminateWork, 2),
     POSIX_FUNC_ENUM(OTHER_IOCTL, IoctlWork, 4),
     POSIX_FUNC_ENUM(OTHER_POLL, Poll, 3),
-    POSIX_FUNC_ENUM(OTHER_GETRLIMIT, GetrlimitWork, 2),    
+    POSIX_FUNC_ENUM(OTHER_GETRLIMIT, GetrlimitWork, 2),
 };
 
-POSIX_FUNCS_IMPL(POSIX_OTHER, g_funcs);
+POSIX_FUNCS_IMPL(POSIX_OTHER, g_funcs)

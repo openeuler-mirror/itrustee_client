@@ -32,7 +32,7 @@ int CalculateBuffSize(size_t *retSize, uint32_t argCount, ...)
     DataType_t argType = 0;
     size_t argBuffSize = 0;
     uint64_t argValue = 0;
-    void *argBufferAddr = NULL;
+    void *argBuffAddr = NULL;
 
     buffSize += sizeof(argCount);
     va_start(arg_ptr, argCount);
@@ -52,7 +52,7 @@ int CalculateBuffSize(size_t *retSize, uint32_t argCount, ...)
                 break;
             case POINTTYPE:
                 argBuffAddr = va_arg(arg_ptr, void *);
-                (void)argBufferAddr;
+                (void)argBuffAddr;
                 argBuffSize = va_arg(arg_ptr, size_t);
                 if (OverflowCheck(sizeof(PointStorage_t), argBuffSize) ||
                     OverflowCheck(buffSize, sizeof(PointStorage_t) + argBuffSize)) {
@@ -188,13 +188,13 @@ end:
 static int DeSerializeParamValidCheck(uint32_t argCount, void *buff, uint32_t buffSize)
 {
     if (buff == NULL || buffSize < sizeof(uint32_t)) {
-        ERR("bad paramters for buf to desrialize\n");
+        ERR("bad paramters for buf to deserialize\n");
         return -EINVAL;
     }
 
     uint32_t retArgCount = *(uint32_t *)buff;
     if (retArgCount != argCount) {
-        ERR("arg count is not match with serialize input\n");
+        ERR("arg count is not match with deserialize input\n");
         return -EINVAL;
     }
     return 0;
@@ -206,7 +206,7 @@ static int ParamTypeCheck(DataType_t src, DataType_t dest)
         if (dest == INTEGERTYPE) {
             ERR("arg type is not match with INTEGERTYPE, src %d, dest %d\n", src, dest);
         } else if (dest == POINTTYPE) {
-            ERR("arg type is not match with POINTTYPE, src %d, dest %d\n", src, dest)
+            ERR("arg type is not match with POINTTYPE, src %d, dest %d\n", src, dest);
         } else {
             ERR("unknown param type to judge, src %d, dest %d\n", src, dest);
         }
@@ -218,7 +218,7 @@ static int ParamTypeCheck(DataType_t src, DataType_t dest)
 static int InterTypeDeserialize(void *srcBuff, uint32_t srcBuffSize, uint32_t byteOffset, uint64_t *retArgValue64Ref)
 {
     if (SerializeInterBuffValidCheck(srcBuffSize, byteOffset) != 0) {
-        return --ENOMEM;
+        return -ENOMEM;
     }
     IntegerStorage_t *interParam = (IntegerStorage_t *)((uint8_t *)srcBuff + byteOffset);
     if (ParamTypeCheck((DataType_t)interParam->type, INTEGERTYPE) != 0) {
@@ -229,7 +229,7 @@ static int InterTypeDeserialize(void *srcBuff, uint32_t srcBuffSize, uint32_t by
     return 0;
 }
 
-static int PointTypeDesrialize(void *srcBuff, uint32_t srcBuffSize, uint32_t byteOffset,
+static int PointTypeDeserialize(void *srcBuff, uint32_t srcBuffSize, uint32_t byteOffset,
                                 void **retArgPointRef, uint64_t *retArgPointSize)
 {
     if (SerializePointBuffValidCheck(srcBuffSize, byteOffset) != 0) {
@@ -248,7 +248,7 @@ static int PointTypeDesrialize(void *srcBuff, uint32_t srcBuffSize, uint32_t byt
     } else {
         *retArgPointRef = NULL;
     }
-    *retArgPointRef = pointParam->size;
+    *retArgPointSize = pointParam->size;
     return 0;
 }
 
@@ -291,7 +291,7 @@ int DeSerialize(uint32_t argCount, void *srcBuff, uint32_t srcBuffSize, ...)
                     goto end;
                 }
                 uint64_t argPointSize = 0;
-                ret = PointTypeDesrialize(srcBuff, srcBuffSize, byteOffset, argPointRef, &argPointSize);
+                ret = PointTypeDeserialize(srcBuff, srcBuffSize, byteOffset, argPointRef, &argPointSize);
                 if (ret != 0) {
                     goto end;
                 }

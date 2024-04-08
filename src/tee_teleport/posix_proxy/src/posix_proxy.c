@@ -9,6 +9,7 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
+#define _GNU_SOURCE
 #include <posix_proxy.h>
 #include <errno.h>
 #include <pthread.h>
@@ -27,22 +28,22 @@
 #include <securec.h>
 #include <sys/wait.h>
 
-#define ALIGN_UP(x, align) (((x) + ((align)-1)) & ~((align)-1))
+#define ALIGN_UP(x, align) (((x) + ((align) - 1)) & ~((align) - 1))
 
-#define CTRL_TASKLET_BUFF_SIZE_KB (4 * K)
+#define CTRL_TASKLET_BUFF_SIZE_KB (4 * KB)
 #define CTRL_TASKLET_THREAD_CONCURRENCY 1
 
 #define DEF_DATA_TASKLET_BUFF_SIZE 64
 #define MIN_DATA_TASKLET_BUFF_SIZE 16
 #define MAX_DATA_TASKLET_BUFF_SIZE 256 * 1024
 
-#define DEF_DATA_TASKLET_BUFF_SIZE_KB ((DEF_DATA_TASKLET_BUFF_SIZE) * (K))
-#define MIN_DATA_TASKLET_BUFF_SIZE_KB ((MIN_DATA_TASKLET_BUFF_SIZE) * (K))
-#define MAX_DATA_TASKLET_BUFF_SIZE_KB ((MAX_DATA_TASKLET_BUFF_SIZE) * (K))
+#define DEF_DATA_TASKLET_BUFF_SIZE_KB ((DEF_DATA_TASKLET_BUFF_SIZE) * (KB))
+#define MIN_DATA_TASKLET_BUFF_SIZE_KB ((MIN_DATA_TASKLET_BUFF_SIZE) * (KB))
+#define MAX_DATA_TASKLET_BUFF_SIZE_KB ((MAX_DATA_TASKLET_BUFF_SIZE) * (KB))
 
 #define DEF_DATA_TASKLET_THREAD_CONCURRENCY 8
-#define MIN_DATA_TASKLET_THREAD_CONCURRENCY 64
-#define MAX_DATA_TASKLET_THREAD_CONCURRENCY 1
+#define MAX_DATA_TASKLET_THREAD_CONCURRENCY 64
+#define MIN_DATA_TASKLET_THREAD_CONCURRENCY 1
 
 struct CtrlTasklet {
     struct Xtasklet *tl;
@@ -56,14 +57,14 @@ struct DataTasklet {
     void *shmBuff;
     size_t shmSz;
     pthread_t fdListTimeoutT;      /* fdList timeout recycle thread */
-    sem_t *fdListTimeoutTExitSem;  /* fdList- timeout recycle thread exit sem */
+    sem_t *fdListTimeoutTExitSem;  /* fdList timeout recycle thread exit sem */
 };
 
 struct PosixProxy {
     struct CtrlTasklet *ctrlTasklet;
     struct DataTasklet *dataTasklet;
-    int devFd;   /* fd retured when open tvm device */
-}
+    int devFd;   /* fd returned when open tvm device */
+};
 
 static struct PosixProxy *g_posix_proxy = NULL;
 
@@ -89,7 +90,7 @@ void SetDataTaskletBufferSize(long size)
         return;
     }
 
-    long BufferByteSize = size * K;
+    long BufferByteSize = size * KB;
     long pageSize = sysconf(_SC_PAGESIZE);
     INFO("page size is %ld\n", pageSize);
     if (pageSize <= 0) {
@@ -160,13 +161,13 @@ static void FreeCtrlTasklet(struct CtrlTasklet *ctrlTasklet)
 {
     if (ctrlTasklet == NULL)
         return;
-    
+
     if (ctrlTasklet->tl != NULL)
         XtaskletDestroy(ctrlTasklet->tl);
-    
+
     if (ctrlTasklet->shmBuff != NULL)
         free(ctrlTasklet->shmBuff);
-    
+
     if (ctrlTasklet->destroySem != NULL) {
         (void)sem_destroy(ctrlTasklet->destroySem);
         free(ctrlTasklet->destroySem);
@@ -252,7 +253,7 @@ int PosixProxyInit(void)
         goto free_fd;
     }
 
-    ret = sem_init(ctrlFlowDestroySem, 0 ,0);
+    ret = sem_init(ctrlFlowDestroySem, 0, 0);
     if (ret < 0) {
         ERR("ctrlFlowDestroySem init failed, errno: %d, err: %s\n", errno, strerror(errno));
         goto free_exit_sem;
@@ -280,7 +281,7 @@ void PosixProxyDestroy(void)
 {
     if (g_posix_proxy == NULL)
         return;
-    
+
     FreeCtrlTasklet(g_posix_proxy->ctrlTasklet);
     FreeDataTasklet(g_posix_proxy->dataTasklet);
     PosixProxyExitDev(g_posix_proxy->devFd);
@@ -290,7 +291,7 @@ void PosixProxyDestroy(void)
 
     pid_t childPid = 0;
     int status = -1;
-    while((childPid = wait(&status)) != -1) {
+    while ((childPid = wait(&status)) != -1) {
         INFO("Child process %d exited with status %d\n", childPid, WEXITSTATUS(status));
     }
 }
@@ -298,12 +299,12 @@ void PosixProxyDestroy(void)
 struct ChildPosixProxyArg {
     sem_t *ctrlTaskletCreatSem;
     int *shmResAddr;
-}
+};
 
 static int ChildPosixProxyFunc(void *arg)
 {
     int ret = -1;
-    struct ChildPosixProxyArg *childArg =  (struct ChildPosixProxyArg *)arg;
+    struct ChildPosixProxyArg *childArg = (struct ChildPosixProxyArg *)arg;
 
     ret = PosixProxyInit();
     if (ret != 0) {
@@ -351,7 +352,7 @@ static int CreateChildWaitResult(struct ChildPosixProxyArg *args, int *child_pid
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += CHILD_CREAT_POSIX_PROXY_TIMEOUT;
-    if (sem_timewait(args->ctrlTaskletCreatSem, &ts) != 0) {
+    if (sem_timedwait(args->ctrlTaskletCreatSem, &ts) != 0) {
         ERR("child create ctrl tasklet is timeout\n");
     }
 
@@ -389,7 +390,7 @@ int PosixProxyRegisterCtrlTasklet(void)
 
     int *shmResAddr = (int *)shmat(shmId, NULL, 0);
     if (shmResAddr == NULL) {
-        ERR("shmat fialed, %s\n", strerror(errno));
+        ERR("shmat failed, %s\n", strerror(errno));
         ret = -errno;
         goto destroy_shmId;
     }
@@ -413,7 +414,7 @@ end:
 static void *FdListPkgTimeoutThreadWork(void *arg)
 {
     struct DataTasklet *dataTasklet = (struct DataTasklet *)arg;
-    while(true) {
+    while (true) {
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_sec += PKG_TIMEOUT_THREAD_SLEEP_S;
@@ -474,7 +475,7 @@ destroy_exit_sem:
 static int CreatDataTasklet(void *shm, size_t shmSz, struct DataTasklet **retdataTasklet)
 {
     int ret = 0;
-    struct Fdlist *fdList = NULL;
+    struct FdList *fdList = NULL;
 
     ret = FdListInit(&fdList);
     if (ret != 0) {
@@ -486,14 +487,14 @@ static int CreatDataTasklet(void *shm, size_t shmSz, struct DataTasklet **retdat
     struct XtaskletCreateProps props = {
         .shm = shm, .shmSz = shmSz, .concurrency = g_data_tasklet_thread_concurrency,
         .fn = PosixDataTaskletCallHandler, .priv = fdList
-    }
+    };
     ret = XtaskletCreate(&props, &dataExecutor);
     if (ret != 0) {
         ERR("create data tasklet executor failed\n");
         goto free_fdList;
     }
 
-    struct DataTasklet *dataTasklet = calloc(1 sizeof(struct DataTasklet));
+    struct DataTasklet *dataTasklet = calloc(1, sizeof(struct DataTasklet));
     if (dataTasklet == NULL) {
         ERR("has no enough memory for dataTasklet\n");
         ret = -ENOMEM;

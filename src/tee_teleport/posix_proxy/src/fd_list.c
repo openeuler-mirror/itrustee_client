@@ -44,13 +44,13 @@ int FdListInit(struct FdList **retFdList)
 
     ListInit(&fdList->list);
 
-    if (pthread_mutexc_init(&fdLIst->bitmapLock, NULL) != 0) {
+    if (pthread_mutex_init(&fdList->bitmapLock, NULL) != 0) {
         ERR("init bitmapLock failed\n");
         ret = -errno;
         goto free_bitmap;
     }
 
-    if (pthread_mutexc_init(&fdLIst->fdListLock, NULL) != 0) {
+    if (pthread_mutex_init(&fdList->fdListLock, NULL) != 0) {
         ERR("init fdListLock failed\n");
         ret = -errno;
         goto free_bitmapLock;
@@ -75,7 +75,7 @@ int FdListPutFD(struct FdList *fdList, int fd)
         return -EINVAL;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->bitmapLock) != 0) {
+    if (pthread_mutex_lock(&fdList->bitmapLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
@@ -93,7 +93,7 @@ int FdListCheckFD(struct FdList *fdList, int fd, bool *res)
         return -EINVAL;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->bitmapLock) != 0) {
+    if (pthread_mutex_lock(&fdList->bitmapLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
@@ -110,7 +110,7 @@ int FdListRemoveFD(struct FdList *fdList, int fd)
         ERR("bad parameters\n");
         return -EINVAL;
     }
-    if (pthread_mutexc_lock(&fdLIst->bitmapLock) != 0) {
+    if (pthread_mutex_lock(&fdList->bitmapLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
@@ -128,7 +128,7 @@ int FdListFreeBitmap(struct FdList *fdList)
         return -EINVAL;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->bitmapLock) != 0) {
+    if (pthread_mutex_lock(&fdList->bitmapLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
@@ -151,7 +151,7 @@ static int FdListCreatPkg(int fd, unsigned long teeIndex, void *buff, size_t buf
 
     struct PkgTmpBuf *pkg = (struct PkgTmpBuf *)malloc(sizeof(struct PkgTmpBuf));
     if (pkg == NULL) {
-        ERR("has no enough memmory for pkg node\n");
+        ERR("has no enough memory for pkg node\n");
         ret = -errno;
         goto end;
     }
@@ -161,7 +161,8 @@ static int FdListCreatPkg(int fd, unsigned long teeIndex, void *buff, size_t buf
     pkg->buff = buff;
     pkg->buffLen = buffLen;
     ListInit(&pkg->list);
-    atomic_init(GetTimestampUs(&pkg->creatTimeUs));
+    atomic_init(&pkg->refCnt, 1);
+    ret = GetTimestampUs(&pkg->creatTimeUs);
     if (ret != 0) {
         ERR("get timestamp failed\n");
         free(pkg);
@@ -173,7 +174,7 @@ end:
     return ret;
 }
 
-static struct PkgTmpBuf *FdlistSearchPkg(struct FdList *fdList, int fd, unsigned long teeIndex)
+static struct PkgTmpBuf *FdListSearchPkg(struct FdList *fdList, int fd, unsigned long teeIndex)
 {
     struct ListNode *ptr = NULL;
     LIST_FOR_EACH(ptr, &fdList->list) {
@@ -182,7 +183,7 @@ static struct PkgTmpBuf *FdlistSearchPkg(struct FdList *fdList, int fd, unsigned
             return tmp;
         }
     }
-    return NULL; 
+    return NULL;
 }
 
 static void FdListFreePkg(struct PkgTmpBuf *pkg)
@@ -225,12 +226,12 @@ int FdListPutPkg(struct FdList *fdList, int fd, unsigned long teeIndex, void *bu
         return -EINVAL;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->fdListLock) != 0) {
+    if (pthread_mutex_lock(&fdList->fdListLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
 
-    struct PkgTmpBuf *tmp = FdlistSearchPkg(fdList, fd, teeIndex);
+    struct PkgTmpBuf *tmp = FdListSearchPkg(fdList, fd, teeIndex);
     if (tmp != NULL) {
         ERR("already has pkg in temp buff, insert is prohibited\n");
         (void)pthread_mutex_unlock(&fdList->fdListLock);
@@ -251,17 +252,17 @@ int FdListPutPkg(struct FdList *fdList, int fd, unsigned long teeIndex, void *bu
 
 int FdListGetPkg(struct FdList *fdList, int fd, unsigned long teeIndex, struct PkgTmpBuf **retPkg)
 {
-     if (fdList == NULL || retPkg == NULL) {
+    if (fdList == NULL || retPkg == NULL) {
         ERR("bad parameters\n");
         return -EINVAL;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->fdListLock) != 0) {
+    if (pthread_mutex_lock(&fdList->fdListLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
 
-    struct PkgTmpBuf *pkg = FdlistSearchPkg(fdList, fd, teeIndex);
+    struct PkgTmpBuf *pkg = FdListSearchPkg(fdList, fd, teeIndex);
     if (pkg == NULL) {
         ERR("target pkg is not in temp buff\n");
         (void)pthread_mutex_unlock(&fdList->fdListLock);
@@ -281,12 +282,12 @@ int FdListReleasePkgByIndex(struct FdList *fdList, int fd, unsigned long teeInde
         return 0;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->fdListLock) != 0) {
+    if (pthread_mutex_lock(&fdList->fdListLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
 
-    struct PkgTmpBuf *pkg = FdlistSearchPkg(fdList, fd, teeIndex);
+    struct PkgTmpBuf *pkg = FdListSearchPkg(fdList, fd, teeIndex);
     if (pkg == NULL) {
         goto end;
     }
@@ -303,13 +304,12 @@ int FdListReleasePkg(struct FdList *fdList, struct PkgTmpBuf *pkg)
         return 0;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->fdListLock) != 0) {
+    if (pthread_mutex_lock(&fdList->fdListLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
     DerefPkg(pkg);
 
-end:
     (void)pthread_mutex_unlock(&fdList->fdListLock);
     return 0;
 }
@@ -331,7 +331,7 @@ int FdListDelTimeoutPkg(struct FdList *fdList)
         return 0;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->fdListLock) != 0) {
+    if (pthread_mutex_lock(&fdList->fdListLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
@@ -346,14 +346,14 @@ int FdListDelTimeoutPkg(struct FdList *fdList)
             ERR("acquire current time failed\n");
             goto end;
         }
-        if (tmp != NULL && (currTime - tmp->creatTimeUS) > GetPkgTimeOutByLen(tmp->buffLen)) {
+        if (tmp != NULL && (currTime - tmp->creatTimeUs) > GetPkgTimeOutByLen(tmp->buffLen)) {
             DerefPkg(tmp);
         }
     }
 
 end:
     (void)pthread_mutex_unlock(&fdList->fdListLock);
-    return 0;
+    return ret;
 }
 
 static int FdListFreePkgList(struct FdList *fdList)
@@ -363,7 +363,7 @@ static int FdListFreePkgList(struct FdList *fdList)
         return 0;
     }
 
-    if (pthread_mutexc_lock(&fdLIst->fdListLock) != 0) {
+    if (pthread_mutex_lock(&fdList->fdListLock) != 0) {
         ERR("acquire lock failed, err: %s\n", strerror(errno));
         return -errno;
     }
@@ -378,7 +378,7 @@ static int FdListFreePkgList(struct FdList *fdList)
     }
 
     (void)pthread_mutex_unlock(&fdList->fdListLock);
-    return 0;
+    return ret;
 }
     
 int FdListDestroy(struct FdList *fdList)
