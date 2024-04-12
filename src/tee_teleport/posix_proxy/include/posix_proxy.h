@@ -15,11 +15,12 @@
 #include <stdio.h>
 
 void SetDataTaskletThreadConcurrency(long concurrency);
-void SetDataTaksletBufferSize(long size);
+void SetDataTaskletBufferSize(long size);
 
 int PosixProxyInit(void);
 void PosixProxyDestroy(void);
 
+void PosixProxySetDevFD(int devFD);
 int PosixProxyRegisterCtrlTasklet(void);
 int PosixProxyRegisterDataTasklet(void);
 int PosixProxyUnregisterAllTasklet(void);

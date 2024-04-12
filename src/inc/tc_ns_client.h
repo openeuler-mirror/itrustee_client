@@ -126,7 +126,7 @@ struct SecLoadIoctlStruct {
 enum PosixProxyShmType {
     CTRL_TASKLET_BUFF = 1,
     DATA_TASKLET_BUFF
-}
+};
 
 struct PosixProxyIoctlArgs {
     enum PosixProxyShmType shmType;

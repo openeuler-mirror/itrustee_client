@@ -17,7 +17,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
-#inlcude <sys/types.h>
+#include <sys/types.h>
 
 #define CONFIG_ENCRYPTION_CONCURRENCY 3
 
@@ -27,7 +27,7 @@
     fprintf(stderr, "[error][pid %d] "fmt, getpid(), ##__VA_ARGS__)
 #ifdef CONFIG_DEBUG_BUILD
 #define DBG(fmt, ...) \
-    fprintf(stderr, "[error][pid %d] "fmt, getpid(), ##__VA_ARGS__)
+    fprintf(stderr, "[debug][pid %d] "fmt, getpid(), ##__VA_ARGS__)
 #else
 #define DBG(fmt, ...)
 #endif
