@@ -157,7 +157,7 @@ void BlockingQueueDestroy(struct BlockingQueue *queue)
     }
     DerefQueue(queue);
 end:
-    return
+    return;
 }
 
 static inline int LockQueue(struct BlockingQueue *queue)
@@ -391,7 +391,7 @@ static void DequeueBlocks(struct BlockingQueue *queue,
     uint32_t len = queue->entriesNr;
     uint32_t nextTail = (tail + meta->prop.remain + 1) % len;
     uint32_t offset = 0;
-    bool nextTailFlip = (bool)((uint32_t)((tail + meta->prop.mremain + 1) >= len) ^ (uint32_t)tailFlip);
+    bool nextTailFlip = (bool)((uint32_t)((tail + meta->prop.remain + 1) >= len) ^ (uint32_t)tailFlip);
     for (size_t i = tail; i != nextTail; i = (i + 1) % len) {
         struct BlockingQueueEntry *entry = &queue->entries[i];
         size_t cnt = meta->prop.size - offset < sizeof(entry->data) ?
