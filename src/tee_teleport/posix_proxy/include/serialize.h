@@ -39,6 +39,6 @@ int CalculateBuffSize(size_t *retSize, uint32_t argCount, ...);
 int Serialize(uint32_t argCount, void *destBuff, uint32_t destBuffSize, ...);
 
 /* params: argCount, destBuff, destBuffSize, { POINTTYPE, point, buffSize }, { INTEGERTYPE, Value64 }, ... */
-int Deserialize(uint32_t argCount, void *srcBuff, uint32_t srcBuffSize, ...);
+int DeSerialize(uint32_t argCount, void *srcBuff, uint32_t srcBuffSize, ...);
 
 #endif
