@@ -49,8 +49,6 @@ static const struct option g_toolOptions[] = {{"install",             required_a
                                               {"save",                required_argument, NULL, 'v'},
                                               {"parameter",           required_argument, NULL, 'p'},
                                               {"optimization",        required_argument, NULL, 'z'},
-                                              {"delete",              required_argument, NULL, 'd'},
-                                              {"query",               required_argument, NULL, 'q'},
                                               {"destroy",             required_argument, NULL, 'e'},
                                               {"uninstall",           required_argument, NULL, 'u'},
                                               {"list",                required_argument, NULL, 'l'},
@@ -91,7 +89,7 @@ static int32_t PrintUsage(const struct TeeTeleportArgs *args, uint32_t sessionID
            "-e: destroy the directory of the app in iTrustee\n"
            "-u: uninstall java runtime or python interpreter to iTrustee\n"
            "-l: list third-party library installed in iTrustee\n"
-           "-f: set running environment\n"
+           "-f: set running environment variable\n"
            "--getlog: get log file from the app\n"
            "--deletelog: delete log file from the app\n"
            "--memory: set memory size for iTrustee corresponds to ree container\n"
@@ -503,7 +501,7 @@ static int32_t ParseParam(char *param, int32_t *num, char **result, int32_t maxN
         flag[tmplen] = '\0';
 
         /* judge current param is equal to "-classpath" */
-        if ((*num > 0 && strcmp(result[(*num) - 1], "-classpath") == 0) || strcmp(result[(*num) - 1], "-cp") == 0) {
+        if ((*num > 0 && (strcmp(result[(*num) - 1], "-classpath") == 0) || strcmp(result[(*num) - 1], "-cp") == 0)) {
             cpFlag = true;
             /* "-classpath" or "-cp" should not be stored as a normal param */
             (*num)--;
@@ -604,7 +602,7 @@ static int32_t TeeRunPython(const char *target, const struct TeeRunParam *runPar
     char *argv[PARAM_NUM_MAX];
     char tarpath[PATH_MAX] = { 0 };
     if (memcpy_s(tarpath, PATH_MAX, target, PATH_MAX) != 0) {
-        printf("failed to copy path in jar!\n");
+        printf("failed to copy path in python!\n");
         return -EFAULT;
     }
 
