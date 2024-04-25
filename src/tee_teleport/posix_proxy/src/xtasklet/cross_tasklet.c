@@ -85,7 +85,7 @@ static void *ExecutorFetch(void *data)
             if (atomic_load(&tl->terminated)) {
                 DBG("tasklet is terminated\n");
             } else {
-                ERR("create task obj from task queueu failed\n");
+                ERR("create task obj from task queue failed\n");
             }
             goto loop;
         }
@@ -123,7 +123,7 @@ int XtaskletCreate(const struct XtaskletCreateProps *props, struct Xtasklet **ta
     ret = BlockingQueueCreate(props->shm, props->shmSz / 2,
                               &tl->taskQ, false, props->concurrency > 1);
     if (ret != 0) {
-        ERR("carete task queue failed\n");
+        ERR("create task queue failed\n");
         goto free_tl;
     }
     ret = BlockingQueueCreate(props->shm + props->shmSz / 2, props->shmSz / 2,
@@ -162,9 +162,9 @@ void XtaskletDestroy(struct Xtasklet *tl)
     }
     atomic_store(&tl->terminated, true);
     BlockingQueueInterrupt(tl->resQ);
-    BlockingQueueDestroy(tl->resQ);
-    ThreadPoolFinalize(&tl->fetchThPool);
     BlockingQueueInterrupt(tl->taskQ);
+    ThreadPoolFinalize(&tl->fetchThPool);
+    BlockingQueueDestroy(tl->resQ);
     BlockingQueueDestroy(tl->taskQ);
     free(tl);
     DBG("xtasklet is destroyed\n");
