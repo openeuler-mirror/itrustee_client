@@ -501,7 +501,7 @@ static int32_t ParseParam(char *param, int32_t *num, char **result, int32_t maxN
         flag[tmplen] = '\0';
 
         /* judge current param is equal to "-classpath" */
-        if ((*num > 0 && (strcmp(result[(*num) - 1], "-classpath") == 0) || strcmp(result[(*num) - 1], "-cp") == 0)) {
+        if (*num > 0 && (strcmp(result[(*num) - 1], "-classpath") == 0 || strcmp(result[(*num) - 1], "-cp") == 0)) {
             cpFlag = true;
             /* "-classpath" or "-cp" should not be stored as a normal param */
             (*num)--;
