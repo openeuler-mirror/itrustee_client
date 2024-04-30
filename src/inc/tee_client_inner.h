@@ -93,6 +93,7 @@ typedef struct {
 } TaFileInfo;
 
 void SetBit(uint32_t i, uint32_t byteMax, uint8_t *bitMap);
+bool CheckBit(uint32_t i, uint32_t byteMax, const uint8_t *bitMap);
 void ClearBit(uint32_t i, uint32_t byteMax, uint8_t *bitMap);
 int32_t GetAndSetBit(uint8_t *bitMap, uint32_t byteMax);
 int32_t GetAndCleartBit(uint8_t *bitMap, uint32_t byteMax);

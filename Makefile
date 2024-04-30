@@ -7,6 +7,7 @@ TARGET_LIBSEC := libboundscheck.so
 TARGET_TEE_TELEPORT := tee_teleport
 TARGET_AGENTD := agentd
 WITH_CONFIDENTIAL_CONTAINER ?= true
+CROSS_DOMAIN_PERF := y
 
 COMMON_CFLAGS :=
 ifeq ($(WITH_CONFIDENTIAL_CONTAINER), true)
@@ -184,12 +185,35 @@ TEE_TELEPORT_SOURCES := src/tee_teleport/tee_teleport.c \
 						src/common/dir.c \
 						src/common/tee_version_check.c
 
+ifeq ($(CROSS_DOMAIN_PERF), y)
+POSIX_PROXY := src/tee_teleport/posix_proxy/src/common.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/xtasklet/blocking_queue.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/xtasklet/thread_pool.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/xtasklet/cross_tasklet.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/posix_data_handler.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/posix_ctrl_handler.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/posix_file.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/posix_network.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/posix_other.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/serialize.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/fd_list.c
+POSIX_PROXY += src/tee_teleport/posix_proxy/src/posix_proxy.c
+POSIX_PROXY += src/libteec_vendor/tee_client_api.c
+
+TEE_TELEPORT_SOURCES += $(POSIX_PROXY)
+endif
+
 TEE_TELEPORT_CFLAGS += -Werror -Wall -Wextra -fstack-protector-all -Wl,-z,relro,-z,now,-z,noexecstack
 TEE_TELEPORT_CFLAGS += -s -fPIE -pie -D_FORTIFY_SOURCE=2 -O2
 TEE_TELEPORT_CFLAGS += -Iinclude -Iinclude/cloud -Isrc/libteec_vendor -Iext_include
-TEE_TELEPORT_CFLAGS += -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/tee_teleport -Isrc/common
+TEE_TELEPORT_CFLAGS += -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/tee_teleport -Isrc/common -Isrc/authentication
+TEE_TELEPORT_CFLAGS += -Isrc/tee_teleport/posix_proxy/include
+TEE_TELEPORT_CFLAGS += -Isrc/tee_teleport/posix_proxy/include/xtasklet
 TEE_TELEPORT_CFLAGS += -DCONFIG_KUNPENG_PLATFORM -DCONFIG_TEE_TELEPORT_SUPPORT
 TEE_TELEPORT_LDFLAGS += $(LD_CFLAGS) -Llibboundscheck/lib -L$(TARGET_DIR) -lboundscheck -lteec -lpthread -lcrypto
+ifeq ($(CROSS_DOMAIN_PERF), y)
+TEE_TELEPORT_CFLAGS += -DCROSS_DOMAIN_PERF
+endif
 $(TARGET_TEE_TELEPORT): $(TARGET_LIBSEC) $(TARGET_LIB)
 	@echo "compile tee_teleport"
 	@$(CC) $(TEE_TELEPORT_CFLAGS) -o $@ $(TEE_TELEPORT_SOURCES) $(TEE_TELEPORT_LDFLAGS)
