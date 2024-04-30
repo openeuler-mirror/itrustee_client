@@ -15,50 +15,94 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <stdint.h>
+
+#ifdef CROSS_DOMAIN_PERF
+#include "posix_proxy.h"
+#endif
 
 #include "dir.h"
 
-static const struct option g_toolOptions[] = {{"install",   required_argument, NULL, 's'},
-                                              {"import",    required_argument, NULL, 'm'},
-                                              {"type",      required_argument, NULL, 't'},
-                                              {"create",    required_argument, NULL, 'c'},
-                                              {"run",       required_argument, NULL, 'r'},
-                                              {"id",        required_argument, NULL, 'i'},
-                                              {"input",     required_argument, NULL, 'n'},
-                                              {"output",    required_argument, NULL, 'o'},
-                                              {"rename",    required_argument, NULL, 'a'},
-                                              {"save",      required_argument, NULL, 'v'},
-                                              {"parameter", required_argument, NULL, 'p'},
-                                              {"delete",    required_argument, NULL, 'd'},
-                                              {"query",     required_argument, NULL, 'q'},
-                                              {"destroy",   required_argument, NULL, 'e'},
-                                              {"uninstall", required_argument, NULL, 'u'},
-                                              {"list",      required_argument, NULL, 'l'},
-                                              {"help",      required_argument, NULL, 'h'},
+enum CliArgType {
+    ARG_CLEAN,
+    ARG_GRPID,
+    ARG_NSID_SET,
+    ARG_CONF_RES,
+    ARG_VMID,
+    ARG_MEMORY,
+    ARG_DISK_SIZE,
+    ARG_CPUSET,
+    ARG_CPUS,
+    ARG_CONTAINER,
+    ARG_CONF_CONT,
+    ARG_GET_LOG,
+    ARG_DEL_LOG
+};
+
+static const struct option g_toolOptions[] = {{"install",             required_argument, NULL, 's'},
+                                              {"import",              required_argument, NULL, 'm'},
+                                              {"type",                required_argument, NULL, 't'},
+                                              {"create",              required_argument, NULL, 'c'},
+                                              {"run",                 required_argument, NULL, 'r'},
+                                              {"id",                  required_argument, NULL, 'i'},
+                                              {"save",                required_argument, NULL, 'v'},
+                                              {"parameter",           required_argument, NULL, 'p'},
+                                              {"optimization",        required_argument, NULL, 'z'},
+                                              {"destroy",             required_argument, NULL, 'e'},
+                                              {"uninstall",           required_argument, NULL, 'u'},
+                                              {"list",                required_argument, NULL, 'l'},
+                                              {"help",                required_argument, NULL, 'h'},
+                                              {"env",                 required_argument, NULL, 'f'},
+                                              {"getlog",              no_argument, NULL, ARG_GET_LOG},
+                                              {"deletelog",           no_argument, NULL, ARG_DEL_LOG},
+                                              {"clean",               no_argument, NULL, ARG_CLEAN},
+                                              {"grpid",               required_argument, NULL, ARG_GRPID},
+                                              {"nsid",                required_argument, NULL, ARG_NSID_SET},
+                                              {"config-container",    no_argument, NULL, ARG_CONF_CONT},
+                                              {"containerid",         required_argument, NULL, ARG_CONTAINER},
+                                              {"config-resource",     no_argument, NULL, ARG_CONF_RES},
+                                              {"memory",              required_argument, NULL, ARG_MEMORY},
+                                              {"cpuset-cpus",         required_argument, NULL, ARG_CPUSET},
+                                              {"cpus",                required_argument, NULL, ARG_CPUS},
+                                              {"disk-size",           required_argument, NULL, ARG_DISK_SIZE},
+                                              {"vmid",                required_argument, NULL, ARG_VMID},
                                               {NULL, 0, NULL, 0}};
 
 static int32_t PrintUsage(const struct TeeTeleportArgs *args, uint32_t sessionID)
 {
     (void)args;
     (void)sessionID;
-    printf("This is a tool for running java or python apps in iTrustee.\n"
+    printf("This is a tool for running elf, java or python apps in iTrustee.\n"
            "Usage:\n"
            "-s: install java runtime or python interpreter to iTrustee\n"
            "-m: install python third party lib to iTrustee\n"
            "-t: specify the installation type: python or java\n"
            "-c: create the main directory for the app in iTrustee\n"
-           "-r: run python file, class file or jar file in iTrustee\n"
+           "-r: run elf file, python file, class file or jar file in iTrustee\n"
            "-i: specify the session id for the app\n"
-           "-n: input files for the app\n"
-           "-a: rename the input file for the app\n"
-           "-o: get output file from the app\n"
            "-v: save the output file with a new name\n"
            "-p: set parameters for the application\n"
-           "-d: delete a file or dir in the app path\n"
-           "-q: query a file or dir in the app path\n"
+           "-z: optimization parameters include the memory size (-m)KB and \n"
+           "    the number of concurrent threads (-j), separated by comma.\n"
+           "    eg: -m512,-j12 .\n"
            "-e: destroy the directory of the app in iTrustee\n"
            "-u: uninstall java runtime or python interpreter to iTrustee\n"
            "-l: list third-party library installed in iTrustee\n"
+           "-f: set running environment variable\n"
+           "--getlog: get log file from the app\n"
+           "--deletelog: delete log file from the app\n"
+           "--memory: set memory size for iTrustee corresponds to ree container\n"
+           "--disk-size: set tmpfs size for iTrustee corresponds to ree container\n"
+           "--cpuset-cpus: set cpuset for iTrustee corresponds to ree container\n"
+           "--cpus: set cpus usage limit for iTrustee corresponds to ree container\n"
+           "--nsid: enter nsid and perform subsequent operations.\n"
+           "--config-resource: specify nsid for iTrustee corresponds to ree container\n"
+           "--config-container: writes information to a triplet on the tee side through nsid and containerid.\n"
+           "--containerid: set container id for other actions\n"
+           "--clean: clean entered nsid and containerid\n"
+           "--vmid: set vmid for iTrustee corresponds to ree vm\n"
+           "--grpid: pass grpid for iTrustee corresponds to ree container\n"
            "-h: print this help message\n");
     return 0;
 }
@@ -87,8 +131,8 @@ static enum TeeInstallUninstallType GetInstallUninstallType(const char *typename
         return PYTHON_INTERPRETER;
     if (strcmp(typename, "java") == 0)
         return JAVA_RUNTIME;
-    if (strcmp(typename, "python_third") == 0)
-        return PYTHON_THIRD_PARTY;
+    if (strcmp(typename, "cfg") == 0)
+        return CGROUP_CONFIGER;
     return INV_INSTALL_UNINSTALL_TYPE;
 }
 
@@ -171,6 +215,178 @@ static int32_t DoList(const struct TeeTeleportArgs *args, uint32_t sessionID)
     return ret;
 }
 
+static int32_t DoDelete(const struct TeeTeleportArgs *args, uint32_t sessionID)
+{
+    (void)args;
+    int ret = TeeDelete(sessionID);
+    if (ret != 0) {
+        printf("failed to delete log\n");
+    } else {
+        printf("successfully deleted log\n");
+    }
+    return ret;
+}
+
+static int32_t ParseStr(const char *str, int base, long *num, char **endPtr)
+{
+    errno = 0;
+    long res = strtol(str, endPtr, base);
+    if ((errno == ERANGE && (res == LONG_MAX || res == LONG_MIN))
+            || (errno != 0 && res == 0) || *endPtr == str) {
+        printf("failed to parse str %s\n", str);
+        return -EINVAL;
+    }
+
+    *num = res;
+    return 0;
+}
+
+static int32_t IsMemConfigValid(const char *memSize)
+{
+    if (memSize == NULL || strlen(memSize) == 0)
+        return -EINVAL;
+    
+    char *endPtr = NULL;
+    long num;
+    int32_t ret = ParseStr(memSize, 10, &num, &endPtr);
+    if (ret != 0) {
+        printf("failed to parse mem config, mem size is %s\n", memSize);
+        return ret;
+    }
+
+    if (endPtr == NULL) {
+        printf("please add k/m/g after mem size!, memSize is %s\n", memSize);
+        return -EINVAL;
+    }
+
+    if (*endPtr != 'K' && *endPtr != 'k' &&
+        *endPtr != 'M' && *endPtr != 'm' &&
+        *endPtr != 'G' && *endPtr != 'g') {
+        printf("please add k/m/g after mem size!\n");
+        return -EINVAL;
+    }
+
+    return 0;
+}
+
+/* containerMsg is a combination of containerId and namespace_id */
+static int32_t CheckContainerId(const char *containerMsg)
+{
+    size_t idLen = strlen(containerMsg);
+    /* check length */
+    if (idLen != CONTAINER_ID_LEN) {
+        printf("idLen = %d\n", (int)idLen);
+        return -EINVAL;
+    }
+
+    for (size_t i = 0; i < CONTAINER_ID_LEN; i++) {
+        if (!isxdigit(containerMsg[i])) {
+            printf("not hex parameter\n");
+            return -EINVAL;
+        }
+    }
+    return 0;
+}
+
+static int32_t DoCleanContainerMsg(const struct TeeTeleportArgs *args, uint32_t sessionID)
+{
+    (void)sessionID;
+    errno_t ret;
+    struct TeePortalContainerType config = {0};
+
+    if (CheckContainerId(args->containerMsg) != 0) {
+        printf("bad container mesg!\n");
+        return -EINVAL;
+    }
+    ret = memcpy_s(config.containerid, sizeof(config.containerid), args->containerMsg, CONTAINER_ID_LEN);
+    if (ret != 0) {
+        printf("memcpy_s failed, ret = %u", ret);
+        return -EINVAL;
+    }
+
+    return TeeSendContainerMsg(&config, CONTAINER_STOP);
+}
+
+static int32_t DoCleanGroupId(const struct TeeTeleportArgs *args, uint32_t sessionID)
+{
+    (void)sessionID;
+    int32_t ret = -1;
+    printf("grp id is %s\n", args->grpId);
+
+    long grpId = -1;
+    char *endPtr = NULL;
+    int base = 10;
+    ret = ParseStr(args->grpId, base, &grpId, &endPtr);
+    if (ret != 0 || *endPtr != '\0') {
+        printf("failed to parse group id when clean!\n");
+        return ret;
+    }
+
+    ret = TeeClean((int)grpId);
+    if (ret != 0) {
+        printf("failed to clean tee resource!\n");
+    }
+
+    return ret;
+}
+
+static int32_t DoClean(const struct TeeTeleportArgs *args, uint32_t sessionID)
+{
+    int32_t ret = 0;
+    if (strlen(args->grpId) != 0) {
+        ret = DoCleanGroupId(args, sessionID);
+        if (ret != 0) {
+            printf("failed to clean group id!\n");
+            return ret;
+        }
+    }
+
+    if (strlen(args->containerMsg) != 0) {
+        ret = DoCleanContainerMsg(args, sessionID);
+        if (ret != 0) {
+            printf("failed to clean container msg!\n");
+        }
+    }
+    return ret;
+}
+
+static int32_t DoRconfig(const struct TeeTeleportArgs *args, uint32_t sessionID)
+{
+    (void)sessionID;
+    int32_t ret = -1;
+    
+    struct TeePortalRConfigType config = {0};
+    char *endPtr = NULL;
+    int base = 10;
+    long nsid = 0;
+    ret = ParseStr(args->nsId, base, &nsid, &endPtr);
+    if (ret == -EINVAL || *endPtr != '\0') {
+        printf("failed to parse nsid!, nsid is %ld\n", nsid);
+        return ret;
+    }
+
+    endPtr = NULL;
+    if (strcmp(args->cpus, "") != 0 && strcpy_s(config.cpus, PARAM_LEN, args->cpus) == 0) {
+        printf("succeed to copy cpus config!\n");
+    }
+
+    if (IsMemConfigValid(args->mem) == 0 && strcpy_s(config.memSize, PARAM_LEN, args->mem) == 0) {
+        printf("succeed to parse mem size config!\n");
+    }
+
+    if (IsMemConfigValid(args->diskSize) == 0 && strcpy_s(config.diskSize, PARAM_LEN, args->diskSize) == 0) {
+        printf("succeed to parse disk size config!\n");
+    }
+
+    if (strcmp(args->cpuset, "") != 0 && strcpy_s(config.cpuset, PARAM_LEN, args->cpuset) == 0) {
+        printf("succeed to parse cpuset config!\n");
+    }
+    
+    ret = TeeRconfig(&config, nsid);
+    printf("TeeRconfig ret is %d\n", ret);
+    return ret;
+}
+
 #define SESSION_ID_SCANF_NUM 1
 static int32_t ReadSessionID(const char *filePath, uint32_t *sessionID)
 {
@@ -196,7 +412,7 @@ static int32_t WriteSessionID(const char *filePath, uint32_t sessionID)
     if (fp == NULL)
         return -EACCES;
 
-    if (fprintf(fp, "%07u", sessionID) < 0) {
+    if (fprintf(fp, "%05u", sessionID) < 0) {
         printf("cannot write session id to file\n");
         (void)fclose(fp);
         return -EACCES;
@@ -211,13 +427,14 @@ enum RunFileType {
     JAVA_FILE_CLASS,
     JAVA_FILE_JAR,
     PYTHON_FILE_PY_PYC,
+    RAW_ELF_FILE,
 };
 
 static enum RunFileType GetRunFileType(const char *filename, char *target)
 {
     char *ret = strrchr(filename, '.');
     if (ret == NULL)
-        return RUN_FILE_NOT_SUPPORTED;
+        goto elf_type;
 
     if (strcmp(ret, ".class") == 0) {
         if (strncpy_s(target, PATH_MAX - 1, filename, (unsigned long)(ret - filename)) != EOK) {
@@ -242,9 +459,15 @@ static enum RunFileType GetRunFileType(const char *filename, char *target)
         }
         return PYTHON_FILE_PY_PYC;
     }
-    return RUN_FILE_NOT_SUPPORTED;
+elf_type:
+    if (strncpy_s(target, PATH_MAX - 1, filename, strlen(filename)) != EOK) {
+        printf("failed to copy elf name!\n");
+        return RUN_FILE_NOT_SUPPORTED;
+    }
+    return RAW_ELF_FILE;
 }
 
+#define GAP_TO_CLASS_PATH 2
 static int32_t ParseParam(char *param, int32_t *num, char **result, int32_t maxNum)
 {
     if (param == NULL)
@@ -253,6 +476,8 @@ static int32_t ParseParam(char *param, int32_t *num, char **result, int32_t maxN
     int32_t tmplen;
     int32_t end = (int)(unsigned int)strlen(param);
     char *flag;
+    /* parse classpath */
+    bool cpFlag = false;
 
     *num = 0;
     while (start < end) {
@@ -274,6 +499,24 @@ static int32_t ParseParam(char *param, int32_t *num, char **result, int32_t maxN
             tmplen++;
 
         flag[tmplen] = '\0';
+
+        /* judge current param is equal to "-classpath" */
+        if (*num > 0 && (strcmp(result[(*num) - 1], "-classpath") == 0 || strcmp(result[(*num) - 1], "-cp") == 0)) {
+            cpFlag = true;
+            /* "-classpath" or "-cp" should not be stored as a normal param */
+            (*num)--;
+        }
+        /* save the content of the classpath */
+        if (cpFlag && *num > 0) {
+            /* result - 2 == argv[RUN_PARAM_INDEX_ONE] == classpath */
+            if (strcpy_s(*(result - GAP_TO_CLASS_PATH), PATH_MAX, result[(*num) - 1]) != EOK) {
+                printf("failed to copy classpath to argv\n");
+                return -EFAULT;
+            }
+            /* classpath content should not be stored as a normal param */
+            (*num)--;
+            cpFlag = false;
+        }
         tmplen++;
         start += tmplen;
     }
@@ -285,7 +528,7 @@ static int32_t ParseParam(char *param, int32_t *num, char **result, int32_t maxN
 #define RUN_PARAM_INDEX_TWO   2
 #define RUN_PARAM_INDEX_THREE 3
 #define RUN_PARAM_INDEX_FOUR  4
-static int32_t TeeRunJavaClass(const char *target, uint32_t sessionID, char *param, int *retVal)
+static int32_t TeeRunJavaClass(const char *target, const struct TeeRunParam *runParam, char *param, int *retVal)
 {
     int32_t paramNum = 0;
     char *argv[PARAM_NUM_MAX];
@@ -308,10 +551,10 @@ static int32_t TeeRunJavaClass(const char *target, uint32_t sessionID, char *par
         return -EFAULT;
     }
     argv[paramNum + RUN_PARAM_INDEX_THREE] = NULL;
-    return TeeRun(RUN_JAVA, paramNum + RUN_PARAM_INDEX_FOUR, argv, sessionID, retVal);
+    return TeeRun(RUN_JAVA, paramNum + RUN_PARAM_INDEX_FOUR, argv, runParam, retVal);
 }
 
-static int32_t TeeRunJavaJar(const char *target, uint32_t sessionID, char *param, int *retVal)
+static int32_t TeeRunJavaJar(const char *target, const struct TeeRunParam *runParam, char *param, int *retVal)
 {
     int32_t paramNum = 0;
     char *argv[PARAM_NUM_MAX];
@@ -330,16 +573,36 @@ static int32_t TeeRunJavaJar(const char *target, uint32_t sessionID, char *param
         return -EFAULT;
     }
     argv[paramNum + RUN_PARAM_INDEX_TWO] = NULL;
-    return TeeRun(RUN_JAVA, paramNum + RUN_PARAM_INDEX_THREE, argv, sessionID, retVal);
+    return TeeRun(RUN_JAVA, paramNum + RUN_PARAM_INDEX_THREE, argv, runParam, retVal);
 }
 
-static int32_t TeeRunPython(const char *target, uint32_t sessionID, char *param, int *retVal)
+static int32_t TeeRunElf(const char *target, const struct TeeRunParam *runParam, char *param, int *retVal)
 {
     int32_t paramNum = 0;
     char *argv[PARAM_NUM_MAX];
     char tarpath[PATH_MAX] = { 0 };
     if (memcpy_s(tarpath, PATH_MAX, target, PATH_MAX) != 0) {
-        printf("failed to copy path in jar!\n");
+        printf("failed to copy path in elf!\n");
+        return -EFAULT;
+    }
+
+    argv[RUN_PARAM_INDEX_ZERO] = tarpath;
+    if (ParseParam(param, &paramNum, argv + RUN_PARAM_INDEX_ONE, PARAM_NUM_MAX - RUN_PARAM_INDEX_TWO) != 0) {
+        printf("parse elf param error\n");
+        return -EFAULT;
+    }
+
+    argv[paramNum + RUN_PARAM_INDEX_ONE] = NULL;
+    return TeeRun(RUN_ELF, paramNum + RUN_PARAM_INDEX_TWO, argv, runParam, retVal);
+}
+
+static int32_t TeeRunPython(const char *target, const struct TeeRunParam *runParam, char *param, int *retVal)
+{
+    int32_t paramNum = 0;
+    char *argv[PARAM_NUM_MAX];
+    char tarpath[PATH_MAX] = { 0 };
+    if (memcpy_s(tarpath, PATH_MAX, target, PATH_MAX) != 0) {
+        printf("failed to copy path in python!\n");
         return -EFAULT;
     }
 
@@ -349,7 +612,7 @@ static int32_t TeeRunPython(const char *target, uint32_t sessionID, char *param,
         return -EFAULT;
     }
     argv[paramNum + RUN_PARAM_INDEX_ONE] = NULL;
-    return TeeRun(RUN_PYTHON, paramNum + RUN_PARAM_INDEX_TWO, argv, sessionID, retVal);
+    return TeeRun(RUN_PYTHON, paramNum + RUN_PARAM_INDEX_TWO, argv, runParam, retVal);
 }
 
 static int IsLegalParam(const char *paramVal)
@@ -360,6 +623,22 @@ static int IsLegalParam(const char *paramVal)
             if (paramVal[i] == filter[j])
                 return -EINVAL;
         }
+    }
+    return 0;
+}
+
+#define MIN_ENV_PARAM_LEN strlen("sep=:;x")
+#define ENV_PARAM_SEP_LEN strlen("sep=")
+static int IsLegalEnvParam(const char *paramVal)
+{
+    size_t paramLen = strlen(paramVal);
+    if (paramLen < MIN_ENV_PARAM_LEN || paramLen > PORTAL_RUN_ARGS_MAXSIZE) {
+        printf("invalid env param length.\n");
+        return -EINVAL;
+    }
+    if (strncmp(paramVal, "sep=", ENV_PARAM_SEP_LEN) != 0) {
+        printf("invalid env param prefix.\n");
+        return -EINVAL;
     }
     return 0;
 }
@@ -382,96 +661,6 @@ static int32_t CheckTeePath(const char *path)
             return -EINVAL;
     }
     return 0;
-}
-
-static int32_t RenameInputFiles(const struct TeeTeleportArgs *args, char *filename, char *dstPath, struct stat ss)
-{
-    char renameDir[PATH_MAX] = { 0 };
-    char oriPath[PATH_MAX] = { 0 };
-    errno_t rc;
-    if (!args->cmd[TP_RENAME]) {
-        return 0;
-    }
-    (void)memcpy_s(oriPath, PATH_MAX, args->renamePath, PATH_MAX);
-    if (CheckTeePath(args->renamePath) != 0) {
-        printf("Invalid rename param!\n");
-        return -EINVAL;
-    }
-    rc = strcpy_s(filename, PATH_MAX, basename(oriPath));
-    if (rc != EOK) {
-        printf("rename input file: copy filename failed %d\n", rc);
-        return -EFAULT;
-    }
-    char *dirp = strdup(args->renamePath);
-    if (dirp == NULL) {
-        printf("strdup failed\n");
-        return -EFAULT;
-    }
-    if (S_ISDIR(ss.st_mode))
-        rc = strcpy_s(renameDir, PATH_MAX, args->renamePath);
-    else if (strcmp(dirname(dirp), ".") == 0)
-        renameDir[0] = 0; /* rc is EOK in this branch */
-    else
-        rc = strcpy_s(renameDir, PATH_MAX, dirname(oriPath));
-    if (rc != EOK) {
-        printf("rename input file: copy rename dir failed %d\n", rc);
-        free(dirp);
-        return -EFAULT;
-    }
-
-    free(dirp);
-
-    if (renameDir[0] == 0) {
-        (void)memset_s(dstPath, PATH_MAX, 0, PATH_MAX);
-    } else {
-        if (memcpy_s(dstPath, PATH_MAX, renameDir, PATH_MAX) < 0) {
-            printf("memcpy_s failed\n");
-            return -EFAULT;
-        }
-    }
-    return 0;
-}
-
-static int32_t DoInput(const struct TeeTeleportArgs *args, uint32_t sessionID)
-{
-    int ret;
-    struct stat ss;
-    char realPath[PATH_MAX] = { 0 };
-    char dstPath[PATH_MAX] = { 0 };
-    char filename[PATH_MAX] = { 0 };
-
-    if (CheckPath(args->inputPath, realPath) != 0) {
-        printf("invalid file or directory!\n");
-        return -EINVAL;
-    }
-
-    if (lstat(realPath, &ss) != 0) {
-        printf("cannot read file info\n");
-        return -EFAULT;
-    }
-    if (S_ISDIR(ss.st_mode)) {
-        if (memcpy_s(dstPath, PATH_MAX, basename(realPath), strlen(basename(realPath))) != EOK) {
-            printf("memcpy_s failed\n");
-            return -EFAULT;
-        }
-    }
-
-    errno_t rc = strcpy_s(filename, PATH_MAX, basename(realPath));
-    if (rc != EOK) {
-        printf("do input: cannot copy filename %d\n", rc);
-        return -EFAULT;
-    }
-
-    if (RenameInputFiles(args, filename, dstPath, ss) != 0) {
-        printf("cannot rename files\n");
-        return -EFAULT;
-    }
-    ret = TeeScp(INPUT, realPath, dstPath, filename, sessionID);
-    if (ret != 0)
-        printf("failed to push %s\n", realPath);
-    else
-        printf("successfully pushed %s\n", realPath);
-    return ret;
 }
 
 static int32_t CheckIDSavePath(const char *idPath)
@@ -527,26 +716,116 @@ static int32_t CheckIDSavePath(const char *idPath)
 static int32_t DoOutput(const struct TeeTeleportArgs *args, uint32_t sessionID)
 {
     char filename[PATH_MAX] = { 0 };
+    char dstPath[PATH_MAX] = { 0 };
     const char *reePath;
-    if (CheckTeePath(args->outputPath) != 0) {
-        printf("bad output path\n");
-        return -EINVAL;
-    }
 
     if (args->cmd[TP_SAVE]) {
         reePath = args->savePath;
     } else {
-        if (strcpy_s(filename, PATH_MAX, args->outputPath) != EOK) {
-            printf("strcpy_s failed\n");
-            return -EFAULT;
-        }
-        reePath = basename(filename);
+        reePath = LOG_NAME;
     }
-    int ret = TeeScp(OUTPUT, reePath, args->outputPath, basename(filename), sessionID);
+    int ret = TeeScp(OUTPUT, reePath, dstPath, filename, sessionID);
     if (ret != 0)
-        printf("failed to pull %s\n", args->outputPath);
+        printf("failed to pull log\n");
     else
-        printf("successfully pulled %s\n", args->outputPath);
+        printf("successfully pulled log\n");
+
+    return ret;
+}
+
+#define NUMBER_BASE10 10
+#define PARAM_PRE_OFFSET 2
+static void DoOptimization(const struct TeeTeleportArgs *args)
+{
+    /* Optimization parameters include the memory size (-m)KB and the number of concurrent threads (-j),
+       separated by comma. eg: -m512,-j12
+     */
+    char optimization[PARAM_LEN_MAX] = { 0 };
+    char *context = NULL;
+    char *token = NULL;
+    const char *sep = ",";
+    char *stop = NULL;
+
+    long m = 0;
+    long j = 0;
+
+    if (strcpy_s(optimization, PARAM_LEN_MAX, args->optimization) != EOK) {
+        printf("copy optimization params failed\n");
+        return;
+    }
+
+    printf("args->optimization %s\n", optimization);
+
+    token = strtok_s(optimization, sep, &context);
+    while (token != NULL) {
+        if (token[0] == '-' && token[1] != '\0') {
+            switch (token[1]) {
+                case 'm':
+                    m = strtol(token + PARAM_PRE_OFFSET, &stop, NUMBER_BASE10);
+                    break;
+                case 'j':
+                    j = strtol(token + PARAM_PRE_OFFSET, &stop, NUMBER_BASE10);
+                    break;
+                default:
+                    printf("invalid option1: %s\n", token);
+                    break;
+            }
+        }
+        token = strtok_s(NULL, sep, &context);
+    }
+
+    printf("optimization -m %ld, -j %ld \n", m, j);
+
+#ifdef CROSS_DOMAIN_PERF
+    SetDataTaskletThreadConcurrency(j);
+    SetDataTaskletBufferSize(m);
+#endif
+}
+
+#define SIGNALED_RET (-1)
+#define STOPPED_RET (-2)
+static int ExcuteTeeRun(const struct TeeTeleportArgs *args, struct TeeRunParam *runParam, char *paramVal)
+{
+    int ret;
+    int retVal;
+    char target[PATH_MAX] = { 0 };
+    if (args == NULL || runParam == NULL || runParam->sessionID == 0) {
+        printf("Bad params\n");
+        return -EINVAL;
+    }
+
+    switch (GetRunFileType(args->runPath, target)) {
+        case JAVA_FILE_CLASS:
+            ret = TeeRunJavaClass(target, runParam, paramVal, &retVal);
+            break;
+        case JAVA_FILE_JAR:
+            ret = TeeRunJavaJar(target, runParam, paramVal, &retVal);
+            break;
+        case PYTHON_FILE_PY_PYC:
+            ret = TeeRunPython(target, runParam, paramVal, &retVal);
+            break;
+        case RAW_ELF_FILE:
+            ret = TeeRunElf(target, runParam, paramVal, &retVal);
+            break;
+        default:
+            printf("bad file type!\n");
+            ret = -EINVAL;
+            break;
+    }
+
+    if (ret != 0) {
+        printf("cannot run file\n");
+        return -EFAULT;
+    }
+
+    if (retVal == SIGNALED_RET)
+        printf("program terminated by signal, may crash\n");
+    else if (retVal == STOPPED_RET)
+        printf("program stopped by signal\n");
+    else if (retVal == 0)
+        printf("successfully run program returns 0\n");
+    else
+        printf("program error returns %d\n", retVal);
 
     return ret;
 }
@@ -556,7 +835,11 @@ static int32_t DoRun(const struct TeeTeleportArgs *args, uint32_t sessionID)
     char *paramVal = NULL;
     char oriParam[PARAM_LEN_MAX] = { 0 };
     int ret;
-    int retVal;
+
+    if (args->cmd[TP_OPTIMIZATION]) {
+        DoOptimization(args);
+    }
+
     if (args->cmd[TP_PARAM]) {
         if (IsLegalParam(args->paramVal) != 0) {
             printf("bad param detected\n");
@@ -566,9 +849,17 @@ static int32_t DoRun(const struct TeeTeleportArgs *args, uint32_t sessionID)
         paramVal = oriParam;
     }
 
-    if (sessionID == 0) {
-        printf("Bad session id\n");
-        return -EINVAL;
+    /* memcpy envParam from TeeTeleportArgs */
+    char *envParam = NULL;
+    char oriEnvParam[PARAM_LEN_MAX] = { 0 };
+    if (args->cmd[TP_ENV]) {
+        /* legal check */
+        if (IsLegalEnvParam(args->envParam) != 0) {
+            printf("bad env param detected\n");
+            return -EINVAL;
+        }
+        (void)memcpy_s(oriEnvParam, PARAM_LEN_MAX, args->envParam, PARAM_LEN_MAX);
+        envParam = oriEnvParam;
     }
 
     if (CheckTeePath(args->runPath) != 0) {
@@ -576,36 +867,11 @@ static int32_t DoRun(const struct TeeTeleportArgs *args, uint32_t sessionID)
         return -EINVAL;
     }
 
-    if (args->cmd[TP_INPUT]) {
-        if (DoInput(args, sessionID) != 0) {
-            printf("cannot input files");
-            return -EFAULT;
-        }
-    }
-
-    char target[PATH_MAX] = { 0 };
-    switch (GetRunFileType(args->runPath, target)) {
-    case JAVA_FILE_CLASS:
-        ret = TeeRunJavaClass(target, sessionID, paramVal, &retVal);
-        break;
-    case JAVA_FILE_JAR:
-        ret = TeeRunJavaJar(target, sessionID, paramVal, &retVal);
-        break;
-    case PYTHON_FILE_PY_PYC:
-        ret = TeeRunPython(target, sessionID, paramVal, &retVal);
-        break;
-    default:
-        printf("bad file type!\n");
-        ret = -EINVAL;
-        break;
-    }
-
+    struct TeeRunParam runParam = {sessionID, envParam};
+    ret = ExcuteTeeRun(args, &runParam, paramVal);
     if (ret != 0) {
-        printf("cannot run file\n");
-        return -EFAULT;
+        return ret;
     }
-
-    printf("successfully run file, program returns %d\n", retVal);
 
     if (args->cmd[TP_OUTPUT]) {
         if (DoOutput(args, sessionID) != 0) {
@@ -715,40 +981,44 @@ static int32_t DoCreate(const struct TeeTeleportArgs *args, uint32_t sessionID)
     return ret;
 }
 
-static int32_t DoDelete(const struct TeeTeleportArgs *args, uint32_t sessionID)
+static int32_t CheckParams(const struct TeeTeleportArgs *args, struct TeePortalContainerType *config)
 {
-    if (CheckTeePath(args->deletePath) != 0) {
-        printf("bad delete path\n");
+    int32_t ret;
+    char *endPtr = NULL;
+    int base = 10; // 10 is the normal length of nsid
+    long ns_id = 0;
+
+    ret = ParseStr(args->nsId, base, &ns_id, &endPtr);
+    if (ret == -EINVAL || *endPtr != '\0') {
+        printf("failed to parse nsid! nsid is %d\n", config->nsid);
+        return ret;
+    }
+
+    config->nsid = (uint32_t)ns_id;
+    if (CheckContainerId(args->containerMsg) != 0) {
+        printf("bad container mesg!\n");
         return -EINVAL;
     }
-    int ret = TeeDelete(args->deletePath, sessionID);
+
+    ret = memcpy_s(config->containerid, sizeof(config->containerid), args->containerMsg, CONTAINER_ID_LEN);
     if (ret != 0) {
-        printf("failed to delete %s\n", args->deletePath);
-    } else {
-        printf("successfully deleted %s\n", args->deletePath);
+        printf("memcpy_s failed, ret = %u", ret);
+        return -EINVAL;
     }
-    return ret;
+
+    return 0;
 }
 
-#define FILE_NOT_FOUNED_RET 1
-static int32_t DoQuery(const struct TeeTeleportArgs *args, uint32_t sessionID)
+static int32_t DoContainer(const struct TeeTeleportArgs *args, uint32_t sessionID)
 {
-    bool exist;
-    if (CheckTeePath(args->queryPath) != 0) {
-        printf("bad query path\n");
+    (void)sessionID;
+    struct TeePortalContainerType config = { 0 };
+    if (CheckParams(args, &config) != 0) {
+        printf("bad container mesg!\n");
         return -EINVAL;
     }
-    int ret = TeeQuery(args->queryPath, sessionID, &exist);
-    if (ret != 0) {
-        printf("failed to query file\n");
-        return -EFAULT;
-    } else if (exist) {
-        printf("file %s exists\n", args->queryPath);
-        return 0;
-    } else {
-        printf("file %s does not exist\n", args->queryPath);
-        return FILE_NOT_FOUNED_RET;
-    }
+
+    return TeeSendContainerMsg(&config, CONTAINER_OPEN);
 }
 
 static const struct TeeTeleportFunc g_teleportFuncTable[] = {
@@ -758,12 +1028,13 @@ static const struct TeeTeleportFunc g_teleportFuncTable[] = {
     {TP_IMPORT,     DoInstall,   false},
     {TP_CREATE,     DoCreate,    false},
     {TP_LIST,       DoList,      false},
+    {TP_CONF_CONT,  DoContainer, false},
     {TP_RUN,        DoRun,       true},
-    {TP_INPUT,      DoInput,     true},
     {TP_OUTPUT,     DoOutput,    true},
     {TP_DELETE,     DoDelete,    true},
-    {TP_QUERY,      DoQuery,     true},
     {TP_DESTROY,    DoDestroy,   true},
+    {TP_CLEAN,      DoClean,     false},
+    {TP_CONF_RES,   DoRconfig,   false},
 };
 
 static const uint32_t g_teleportFuncNum = sizeof(g_teleportFuncTable) / sizeof(g_teleportFuncTable[0]);
@@ -791,7 +1062,7 @@ static int32_t HandleUserCmd(struct TeeTeleportArgs *args)
     return -EINVAL;
 }
 
-static int32_t CopyArgs(bool *argkey, char *argvalue)
+static int32_t CopyArgs(bool *argkey, char *argvalue, uint32_t size)
 {
     *argkey = true;
     if (argvalue == NULL)
@@ -803,44 +1074,53 @@ static int32_t CopyArgs(bool *argkey, char *argvalue)
         return -EINVAL;
 	}
 
-    if (strcpy_s(argvalue, PATH_MAX, optarg) != EOK) {
+    if (strcpy_s(argvalue, size - 1, optarg) != EOK) {
         printf("strcpy_s failed\n");
         return -EFAULT;
     }
     return 0;
 }
 
-#define CASE_COPY_ARG(opt, argkey, argvalue) \
+#define CASE_COPY_ARG(opt, argkey, argvalue, size) \
     case opt: \
-        if (CopyArgs(argkey, argvalue) != 0) \
+        if (CopyArgs(argkey, argvalue, size) != 0) \
             return -EFAULT; \
         break;
 
 static int32_t ParseArgs(int32_t argc, char **argv, struct TeeTeleportArgs *args)
 {
-    while(1) {
+    while (1) {
         int32_t optIndex = 0;
-        int32_t opt = getopt_long(argc, argv, "s:m:t:c:r:i:n:o:a:v:p:d:q:euhl", g_toolOptions, &optIndex);
+        int32_t opt = getopt_long(argc, argv, "s:m:t:c:r:i:v:p:z:f:k:w:heul", g_toolOptions, &optIndex);
         if (opt < 0)
             break;
         switch (opt) {
-        CASE_COPY_ARG('s', &args->cmd[TP_INSTALL],   args->installPath);
-        CASE_COPY_ARG('m', &args->cmd[TP_IMPORT],    args->importPath);
-        CASE_COPY_ARG('t', &args->cmd[TP_TYPE],      args->typeParam);
-        CASE_COPY_ARG('c', &args->cmd[TP_CREATE],    args->createPath);
-        CASE_COPY_ARG('r', &args->cmd[TP_RUN],       args->runPath);
-        CASE_COPY_ARG('i', &args->cmd[TP_ID],        args->idPath);
-        CASE_COPY_ARG('n', &args->cmd[TP_INPUT],     args->inputPath);
-        CASE_COPY_ARG('o', &args->cmd[TP_OUTPUT],    args->outputPath);
-        CASE_COPY_ARG('a', &args->cmd[TP_RENAME],    args->renamePath);
-        CASE_COPY_ARG('v', &args->cmd[TP_SAVE],      args->savePath);
-        CASE_COPY_ARG('p', &args->cmd[TP_PARAM],     args->paramVal);
-        CASE_COPY_ARG('d', &args->cmd[TP_DELETE],    args->deletePath);
-        CASE_COPY_ARG('q', &args->cmd[TP_QUERY],     args->queryPath);
-        CASE_COPY_ARG('e', &args->cmd[TP_DESTROY],   NULL);
-        CASE_COPY_ARG('u', &args->cmd[TP_UNINSTALL], NULL);
-        CASE_COPY_ARG('l', &args->cmd[TP_LIST],      NULL);
-        CASE_COPY_ARG('h', &args->cmd[TP_HELP],      NULL);
+        CASE_COPY_ARG('s',             &args->cmd[TP_INSTALL],   args->installPath,     PATH_MAX);
+        CASE_COPY_ARG('m',             &args->cmd[TP_IMPORT],    args->importPath,      PATH_MAX);
+        CASE_COPY_ARG('t',             &args->cmd[TP_TYPE],      args->typeParam,       PARAM_LEN);
+        CASE_COPY_ARG('c',             &args->cmd[TP_CREATE],    args->createPath,      PATH_MAX);
+        CASE_COPY_ARG('r',             &args->cmd[TP_RUN],       args->runPath,         PATH_MAX);
+        CASE_COPY_ARG('i',             &args->cmd[TP_ID],        args->idPath,          PATH_MAX);
+        CASE_COPY_ARG('v',             &args->cmd[TP_SAVE],      args->savePath,        PATH_MAX);
+        CASE_COPY_ARG('p',             &args->cmd[TP_PARAM],     args->paramVal,        PARAM_LEN_MAX);
+        CASE_COPY_ARG('z',             &args->cmd[TP_OPTIMIZATION], args->optimization, PARAM_LEN_MAX);
+        CASE_COPY_ARG('f',             &args->cmd[TP_ENV],       args->envParam,    PARAM_LEN_MAX);
+        CASE_COPY_ARG('e',             &args->cmd[TP_DESTROY],   NULL,                  0);
+        CASE_COPY_ARG('u',             &args->cmd[TP_UNINSTALL], NULL,                  0);
+        CASE_COPY_ARG('l',             &args->cmd[TP_LIST],      NULL,                  0);
+        CASE_COPY_ARG('h',             &args->cmd[TP_HELP],      NULL,                  0);
+        CASE_COPY_ARG(ARG_GET_LOG,     &args->cmd[TP_OUTPUT],    NULL,                  0);
+        CASE_COPY_ARG(ARG_DEL_LOG,     &args->cmd[TP_DELETE],    NULL,                  0);
+        CASE_COPY_ARG(ARG_CLEAN,       &args->cmd[TP_CLEAN],     NULL,                  0);
+        CASE_COPY_ARG(ARG_GRPID,       &args->cmd[TP_GRPID],     args->grpId,           PARAM_LEN);
+        CASE_COPY_ARG(ARG_NSID_SET,    &args->cmd[TP_NSID_SET],  args->nsId,            PARAM_LEN);
+        CASE_COPY_ARG(ARG_CONF_RES,    &args->cmd[TP_CONF_RES],  NULL,                  0);
+        CASE_COPY_ARG(ARG_CONTAINER,   &args->cmd[TP_CONTAINER], args->containerMsg,    PARAM_LEN_MAX);
+        CASE_COPY_ARG(ARG_CONF_CONT,   &args->cmd[TP_CONF_CONT], NULL,                  PARAM_LEN_MAX);
+        CASE_COPY_ARG(ARG_MEMORY,      &args->cmd[TP_MEM],       args->mem,             PARAM_LEN);
+        CASE_COPY_ARG(ARG_CPUSET,      &args->cmd[TP_CPUSET],    args->cpuset,          PARAM_LEN_MAX);
+        CASE_COPY_ARG(ARG_CPUS,        &args->cmd[TP_CPUS],      args->cpus,            PARAM_LEN);
+        CASE_COPY_ARG(ARG_DISK_SIZE,   &args->cmd[TP_DISK_SIZE], args->diskSize,        PARAM_LEN);
         default:
             printf("please use -h to see the usage.\n");
             return -EINVAL;

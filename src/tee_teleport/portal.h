@@ -9,6 +9,7 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  */
+
 #ifndef TEE_TP_PORTAL_H
 #define TEE_TP_PORTAL_H
 
@@ -17,8 +18,18 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "cgroup_util.h"
+#ifdef CROSS_DOMAIN_PERF
+#include "posix_proxy.h"
+#include "tc_ns_client.h"
+#endif
+
 #define PORTAL_CMD_FILE_MASK 0x10000
 #define PORTAL_CMD_RUN_MASK 0x20000
+
+#define CONTAINER_ID_LEN 64
+#define CONTAINER_OPEN 0x01
+#define CONTAINER_STOP 0x02
 
 #ifndef SHA256_DIGEST_LENGTH
 #define SHA256_DIGEST_LENGTH 32
@@ -34,8 +45,12 @@ enum TeePortalCmdType {
     INSTALL,              // include install python, java, python third party lib and app
     UNINSTALL,
     LIST,
+    CLEAN,
+    RCONFIG,
     RUN_PYTHON = PORTAL_CMD_RUN_MASK,
     RUN_JAVA,
+	RUN_ELF,
+    SEND_CONTAINER_MSG,
 };
 
 enum TeeInstallUninstallType {
@@ -43,34 +58,41 @@ enum TeeInstallUninstallType {
     JAVA_RUNTIME,
     PYTHON_THIRD_PARTY,
     APPLICATION,
+    INPUT_CODE,
+    CGROUP_CONFIGER,
     INV_INSTALL_UNINSTALL_TYPE,
 };
 
 struct TeePortalTransportType {
-    uint32_t fileSize;
-    uint32_t blks;
+    uint64_t fileSize;
+    uint64_t blks;
     uint32_t bs;
-    uint32_t nbr;
+    uint64_t nbr;
     char basename[FILENAME_MAX]; // the filename in REE
     char dstPath[PATH_MAX];      // the path in TEE
-    unsigned char md[SHA256_DIGEST_LENGTH];
     uint32_t srcDataSize;
     uint32_t srcData[1];
 };
-
 struct TeePortalQueryType {
-    unsigned char md[SHA256_DIGEST_LENGTH]; // file checksum
     char basename[FILENAME_MAX];            // the filename in REE
     char dstPath[PATH_MAX];                 // the path in TEE
     bool exist;
     bool isDir;
     bool checkMD;
 };
+
+struct TeePortalSendContainerMsgType {
+    char containerId[CONTAINER_ID_LEN];
+    uint32_t mode;
+};
+
 #define PORTAL_RUN_ARGS_MAXSIZE 512
 struct TeePortalRunType {
+    char cwd[PATH_MAX]; /* REE current work directory */
     char file[FILENAME_MAX]; // the path in TEE
     uint32_t xargsSize;
     char xargs[PORTAL_RUN_ARGS_MAXSIZE];
+    char envParam[PORTAL_RUN_ARGS_MAXSIZE]; // environment variable
 };
 
 struct TeePortalListType {
@@ -84,17 +106,25 @@ struct TeePortalInstallType {
     char file[FILENAME_MAX];
 };
 
+struct TeePortalCleanType {
+    int grpId;
+};
+
 struct TeePortalType {
     enum TeePortalCmdType type;
     int ret;
     uint32_t reeUID;
     uint32_t sessionID;
+    uint32_t nsId;
     union Args1 {
         struct TeePortalTransportType transport;
         struct TeePortalQueryType query;
+        struct TeePortalSendContainerMsgType containerMsg;
         struct TeePortalRunType run;
         struct TeePortalListType list;
         struct TeePortalInstallType install;
+        struct TeePortalCleanType clean;
+        struct TeePortalRConfigType rconfig;
     } args;
 };
 
@@ -103,4 +133,9 @@ int GetPortal(void **portal, uint32_t *portalSize);
 int TriggerPortal(void);
 void DestroyPortal(void);
 
+#ifdef CROSS_DOMAIN_PERF
+int PosixProxyRegisterTaskletRequest(int devFd, struct PosixProxyIoctlArgs *args);
+int PosixProxyInitDev(void);
+void PosixProxyExitDev(int devFd);
+#endif
 #endif

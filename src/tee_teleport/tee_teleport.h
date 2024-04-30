@@ -24,6 +24,7 @@
 
 #define PARAM_NUM_MAX 64
 #define PARAM_LEN_MAX PATH_MAX
+#define LOG_NAME "tee.log"
 
 enum TeleportArgType {
     TP_INSTALL,
@@ -38,19 +39,32 @@ enum TeleportArgType {
     TP_SAVE,
     TP_PARAM,
     TP_DELETE,
+    TP_OPTIMIZATION,
     TP_QUERY,
     TP_DESTROY,
     TP_UNINSTALL,
     TP_LIST,
     TP_HELP,
+    TP_CONTAINER,
+    TP_CLEAN,
+    TP_GRPID,
+    TP_CONF_RES,
+    TP_CONF_CONT,
+    TP_NSID_SET,
+    TP_MEM,
+    TP_CPUSET,
+    TP_CPUS,
+    TP_DISK_SIZE,
+    TP_ENV,
     TP_TYPE_MAX,
 };
 
+#define PARAM_LEN 64
 struct TeeTeleportArgs {
     bool cmd[TP_TYPE_MAX];
     char installPath[PATH_MAX];
     char importPath[PATH_MAX];
-    char typeParam[PATH_MAX];
+    char typeParam[PARAM_LEN];
     char createPath[PATH_MAX];
     char runPath[PATH_MAX];
     char idPath[PATH_MAX];
@@ -59,8 +73,16 @@ struct TeeTeleportArgs {
     char renamePath[PATH_MAX];
     char savePath[PATH_MAX];
     char paramVal[PARAM_LEN_MAX];
-    char deletePath[PATH_MAX];
-    char queryPath[PATH_MAX];
+    char optimization[PARAM_LEN_MAX];
+    char containerMsg[PARAM_LEN_MAX];
+    char grpId[PARAM_LEN];
+    char nsId[PARAM_LEN];
+    char mem[PARAM_LEN];
+    char cpuset[PARAM_LEN_MAX];
+    char vmid[PARAM_LEN];
+    char cpus[PARAM_LEN];
+    char diskSize[PARAM_LEN];
+    char envParam[PARAM_LEN_MAX];
 };
 
 struct TeeTeleportFunc {

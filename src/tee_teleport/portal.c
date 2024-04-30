@@ -29,6 +29,7 @@
 #include "tc_ns_client.h"
 #include "tee_version_check.h"
 #include "portal.h"
+#include "posix_proxy.h"
 
 #define DEF_PORTAL_SIZE (16 * 1024 * 1024)   /* 16MB */
 static int g_devFd = -EINVAL;
@@ -71,7 +72,7 @@ int InitPortal(void)
     }
 
     pageSize = sysconf(_SC_PAGESIZE);
-    if (pageSize < 0) {
+    if (pageSize <= 0) {
         printf("cannot get page size\n");
         close(fd);
         return -EFAULT;
@@ -109,7 +110,7 @@ int InitPortal(void)
 int GetPortal(void **portal, uint32_t *portalSize)
 {
     if (portal == NULL || portalSize == NULL) {
-        tloge("cannot get portal, bad param\n");
+        printf("cannot get portal, bad param\n");
         return -EINVAL;
     }
 
@@ -138,3 +139,30 @@ void DestroyPortal(void)
     g_portalSize = 0;
 }
 
+#ifdef CROSS_DOMAIN_PERF
+int PosixProxyRegisterTaskletRequest(int devFd, struct PosixProxyIoctlArgs *args)
+{
+    if (args == NULL || devFd < 0)
+        return -EFAULT;
+
+    return ioctl(devFd, (unsigned long)TC_NS_CLIENT_IOCTL_POSIX_PROXY_REGISTER_TASKLET, args);
+}
+
+int PosixProxyInitDev(void)
+{
+    int devFd = open(TC_NS_CVM_DEV_NAME, O_RDWR);
+    if (devFd < 0) {
+        printf("open tee client dev failed\n");
+        return -EFAULT;
+    }
+    PosixProxySetDevFD(devFd);
+    return devFd;
+}
+
+void PosixProxyExitDev(int devFd)
+{
+    if (devFd >= 0)
+        close(devFd);
+    PosixProxySetDevFD(-1);
+}
+#endif

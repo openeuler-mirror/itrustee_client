@@ -26,6 +26,10 @@
 #include "tee_client_api.h"
 #include "tee_sys_log.h"
 #include "tc_ns_client.h"
+#ifdef CROSS_DOMAIN_PERF
+#include "posix_proxy.h"
+#include <sys/prctl.h>
+#endif
 
 #define MAX_ARGV_LENGTH 4096
 
@@ -69,38 +73,93 @@ static int MakeArgs(int argc, char **argv, char *xargs, uint32_t *size)
     return 0;
 }
 
-int TeeRun(int program, int argc, char **argv, uint32_t sessionID, int *retVal)
+static int ConfigPortal(struct TeePortalType *portal, int program, const struct TeeRunParam *runParam)
+{
+    if (runParam->envParam != NULL) {
+        (void)memset_s(portal->args.run.envParam, PORTAL_RUN_ARGS_MAXSIZE, 0, PORTAL_RUN_ARGS_MAXSIZE);
+        if (strcat_s(portal->args.run.envParam, PORTAL_RUN_ARGS_MAXSIZE, runParam->envParam) != EOK) {
+            printf("strcat envParam to portal failed\n");
+            return -EFAULT;
+        }
+    }
+    portal->type = program;
+    portal->sessionID = runParam->sessionID;
+    return 0;
+}
+
+static int RunInitPortal(int program, int argc, char **argv, const struct TeeRunParam *runParam,
+                        struct TeePortalType **retPortal)
+{
+    int ret = 0;
+    uint32_t argSize = PORTAL_RUN_ARGS_MAXSIZE;
+    uint32_t portalSize;
+    struct TeePortalType *portal = NULL;
+
+    ret = GetPortal((void**)&portal, &portalSize);
+    if (ret != 0) {
+        printf("get portal failed\n");
+        return ret;
+    }
+
+    /* set current working directory */
+    if (getcwd(portal->args.run.cwd, sizeof(portal->args.run.cwd)) == NULL) {
+        ret = -errno;
+        fprintf(stderr, "get current work dir failed: %s\n", strerror(-ret));
+        return ret;
+    }
+    /* make args from argv to string */
+    ret = MakeArgs(argc, argv, portal->args.run.xargs, &argSize);
+    if (ret != 0) {
+        printf("make args failed!\n");
+        return ret;
+    }
+    portal->args.run.xargsSize = argSize;
+    portal->reeUID = getuid();
+    ret = ConfigPortal(portal, program, runParam);
+    if (ret != 0) {
+        printf("Config portal failed!\n");
+        return ret;
+    }
+    *retPortal = portal;
+    return ret;
+}
+
+int TeeRun(int program, int argc, char **argv, const struct TeeRunParam *runParam, int *retVal)
 {
     if (argc <= 1 || argv == NULL || argv[0] == NULL || retVal == NULL) {
         printf("tee run check input failed\n");
         return -EINVAL;
     }
-    uint32_t portalSize;
+    int ret = 0;
     struct TeePortalType *portal = NULL;
-
-    if (GetPortal((void**)&portal, &portalSize) != 0) {
-        printf("get portal failed\n");
-        return -EFAULT;
-    }
-
-    /* make args from argv to string */
-    uint32_t argSize = PORTAL_RUN_ARGS_MAXSIZE;
-    int ret = MakeArgs(argc, argv, portal->args.run.xargs, &argSize);
+    ret = RunInitPortal(program, argc, argv, runParam, &portal);
     if (ret != 0) {
-        printf("make args failed\n");
-        goto out;
+        printf("init portal failed before run\n");
+        return ret;
     }
-    portal->args.run.xargsSize = argSize;
 
-    portal->type = program;
-    portal->sessionID = sessionID;
-    portal->reeUID = getuid();
+#ifdef CROSS_DOMAIN_PERF
+    ret = prctl(PR_SET_CHILD_SUBREAPER, 1);
+    if (ret != 0) {
+        tloge("set subreaper failed, errno %d, %s\n", errno, strerror(errno));
+        return ret;
+    }
+    ret = PosixProxyInit();
+    if (ret != 0) {
+        printf("posix proxy init failed\n");
+        return ret;
+    } 
+#endif
     ret = TriggerPortal();
     if (ret != 0) {
         printf("trigger portal failed\n");
-        goto out;
+        goto end;
     }
     *retVal = portal->ret;
-out:
+end:
+#ifdef CROSS_DOMAIN_PERF
+    printf("trigger finished, posix proxy exit\n");
+    PosixProxyDestroy();
+#endif
     return ret;
 }
