@@ -249,7 +249,7 @@ static int TeeGetCaName(int caPid, char *caName, size_t nameLen)
 int TeeGetPkgName(int caPid, char *path, size_t pathLen)
 {
     if (path == NULL || pathLen > MAX_PATH_LENGTH) {
-        tloge("path is null or path len overflow\n");
+        tloge("path is null or path len overflows\n");
         return -1;
     }
 
