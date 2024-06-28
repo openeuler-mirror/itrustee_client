@@ -131,8 +131,6 @@ static enum TeeInstallUninstallType GetInstallUninstallType(const char *typename
         return PYTHON_INTERPRETER;
     if (strcmp(typename, "java") == 0)
         return JAVA_RUNTIME;
-    if (strcmp(typename, "cfg") == 0)
-        return CGROUP_CONFIGER;
     return INV_INSTALL_UNINSTALL_TYPE;
 }
 
