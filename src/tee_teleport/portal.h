@@ -20,7 +20,6 @@
 
 #include "cgroup_util.h"
 #ifdef CROSS_DOMAIN_PERF
-#include "posix_proxy.h"
 #include "tc_ns_client.h"
 #endif
 

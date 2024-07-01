@@ -209,7 +209,7 @@ TEE_TELEPORT_CFLAGS += -Iinclude -Iinclude/cloud -Isrc/libteec_vendor -Iext_incl
 TEE_TELEPORT_CFLAGS += -Ilibboundscheck/include -Iinclude -Isrc/inc -Isrc/tee_teleport -Isrc/common -Isrc/authentication
 TEE_TELEPORT_CFLAGS += -Isrc/tee_teleport/posix_proxy/include
 TEE_TELEPORT_CFLAGS += -Isrc/tee_teleport/posix_proxy/include/xtasklet
-TEE_TELEPORT_CFLAGS += -DCONFIG_KUNPENG_PLATFORM -DCONFIG_TEE_TELEPORT_SUPPORT
+TEE_TELEPORT_CFLAGS += -DCONFIG_KUNPENG_PLATFORM -DCONFIG_TEE_TELEPORT_SUPPORT -D_GNU_SOURCE
 TEE_TELEPORT_LDFLAGS += $(LD_CFLAGS) -Llibboundscheck/lib -L$(TARGET_DIR) -lboundscheck -lteec -lpthread -lcrypto
 ifeq ($(CROSS_DOMAIN_PERF), y)
 TEE_TELEPORT_CFLAGS += -DCROSS_DOMAIN_PERF

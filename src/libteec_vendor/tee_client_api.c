@@ -422,22 +422,22 @@ TEEC_Session *FindAndRemoveSession(const TEEC_Session *session, TEEC_ContextHidl
 
 static void ReleaseSharedMemory(TEEC_SharedMemoryHidl *sharedMem)
 {
-    bool condition = (sharedMem->is_allocated) && (sharedMem->buffer != NULL) && (sharedMem->buffer != ZERO_SIZE_PTR) &&
-                     (sharedMem->size != 0);
-    if (condition) {
-        if (sharedMem->flags == TEEC_MEM_SHARED_INOUT || sharedMem->flags == TEEC_MEM_REGISTER_INOUT) {
-            if (sharedMem->buffer != NULL)
-                free(sharedMem->buffer);
-        } else {
-            int32_t ret = munmap(sharedMem->buffer, sharedMem->size);
-            if (ret != 0) {
+    if ((!sharedMem->is_allocated) || (sharedMem->buffer == NULL)) {
+        goto CLEAR_SHM;
+    }
+
+    if (sharedMem->flags == TEEC_MEM_SHARED_INOUT || sharedMem->flags == TEEC_MEM_REGISTER_INOUT) {
+        free(sharedMem->buffer);
+    } else {
+        if ((sharedMem->buffer != ZERO_SIZE_PTR) && (sharedMem->size != 0)) {
+            if (munmap(sharedMem->buffer, sharedMem->size) != 0) {
                 tloge("Release SharedMemory failed, munmap error\n");
             }
         }
-        ClearBitWithLock(&sharedMem->context->shrMemBitMapLock, sharedMem->offset,
-                         sizeof(sharedMem->context->shm_bitmap), sharedMem->context->shm_bitmap);
     }
-
+    ClearBitWithLock(&sharedMem->context->shrMemBitMapLock, sharedMem->offset,
+                         sizeof(sharedMem->context->shm_bitmap), sharedMem->context->shm_bitmap);
+CLEAR_SHM:
     sharedMem->buffer  = NULL;
     sharedMem->size    = 0;
     sharedMem->flags   = 0;
@@ -1229,12 +1229,11 @@ static TEEC_Result CheckSharedMemoryParam(const TEEC_ContextHidl *context, const
         return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
     }
 
-    bool condition = ((sharedMem->flags != TEEC_MEM_INPUT) && (sharedMem->flags != TEEC_MEM_OUTPUT) &&
-                                        (sharedMem->flags != TEEC_MEM_INOUT) &&
-                                        (sharedMem->flags != TEEC_MEM_SHARED_INOUT));
+    bool condition = (sharedMem->flags != TEEC_MEM_INPUT) && (sharedMem->flags != TEEC_MEM_OUTPUT) &&
+                    (sharedMem->flags != TEEC_MEM_INOUT) && (sharedMem->flags != TEEC_MEM_SHARED_INOUT);
     if (shrMemType == ALLOCATE) {
         condition = condition && (sharedMem->flags != TEEC_MEM_REGISTER_INOUT);
-    } else if (sharedMem == REGISTER) {
+    } else if (shrMemType == REGISTER) {
         condition = condition || (sharedMem->buffer == NULL);
     }
 
