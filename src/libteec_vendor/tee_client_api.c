@@ -422,22 +422,22 @@ TEEC_Session *FindAndRemoveSession(const TEEC_Session *session, TEEC_ContextHidl
 
 static void ReleaseSharedMemory(TEEC_SharedMemoryHidl *sharedMem)
 {
-    bool condition = (sharedMem->is_allocated) && (sharedMem->buffer != NULL) && (sharedMem->buffer != ZERO_SIZE_PTR) &&
-                     (sharedMem->size != 0);
-    if (condition) {
-        if (sharedMem->flags == TEEC_MEM_SHARED_INOUT) {
-            if (sharedMem->buffer != NULL)
-                free(sharedMem->buffer);
-        } else {
-            int32_t ret = munmap(sharedMem->buffer, sharedMem->size);
-            if (ret != 0) {
+    if ((!sharedMem->is_allocated) || (sharedMem->buffer == NULL)) {
+        goto CLEAR_SHM;
+    }
+
+    if (sharedMem->flags == TEEC_MEM_SHARED_INOUT || sharedMem->flags == TEEC_MEM_REGISTER_INOUT) {
+        free(sharedMem->buffer);
+    } else {
+        if ((sharedMem->buffer != ZERO_SIZE_PTR) && (sharedMem->size != 0)) {
+            if (munmap(sharedMem->buffer, sharedMem->size) != 0) {
                 tloge("Release SharedMemory failed, munmap error\n");
             }
         }
-        ClearBitWithLock(&sharedMem->context->shrMemBitMapLock, sharedMem->offset,
-                         sizeof(sharedMem->context->shm_bitmap), sharedMem->context->shm_bitmap);
     }
-
+    ClearBitWithLock(&sharedMem->context->shrMemBitMapLock, sharedMem->offset,
+                         sizeof(sharedMem->context->shm_bitmap), sharedMem->context->shm_bitmap);
+CLEAR_SHM:
     sharedMem->buffer  = NULL;
     sharedMem->size    = 0;
     sharedMem->flags   = 0;
@@ -1119,6 +1119,21 @@ static TEEC_Result ProcessInvokeCommand(const TEEC_ContextHidl *context, TC_NS_C
     return teecRet;
 }
 
+static TEEC_Result CheckRegisterShm(const TEEC_Operation *operation)
+{
+    if (operation == NULL) {
+        return TEEC_SUCCESS;
+    }
+
+    for (uint32_t paramCnt = 0; paramCnt < TEEC_PARAM_NUM; paramCnt++) {
+        if (TEEC_PARAM_TYPE_GET(operation->paramTypes, paramCnt) == TEEC_MEMREF_REGISTER_INOUT) {
+            return TEEC_ERROR_BAD_PARAMETERS;
+        }
+    }
+
+    return TEEC_SUCCESS;
+}
+
 /*
  * Function:       TEEC_InvokeCommand
  * Description:   This function invokes a Command within the specified Session.
@@ -1144,6 +1159,12 @@ TEEC_Result TEEC_InvokeCommandHidl(const TEEC_ContextHidl *context, const TEEC_S
     teecRet = TEEC_CheckOperation(operation);
     if (teecRet != TEEC_SUCCESS) {
         tloge("operation is invalid\n");
+        goto ERROR;
+    }
+
+    teecRet = CheckRegisterShm(operation);
+    if (teecRet != TEEC_SUCCESS) {
+        tloge("register shared memory cannot map with invoke command\n");
         goto ERROR;
     }
 
@@ -1197,30 +1218,40 @@ END:
     return ret;
 }
 
-/*
- * Function:       TEEC_RegisterSharedMemory
- * Description:   This function registers a block of existing Client Application memory
- *                     as a block of Shared Memory within the scope of the specified TEE Context.
- * Parameters:   context: a pointer to an initialized TEE Context.
- *                     sharedMem: a pointer to a Shared Memory structure to register.
- * Return:         TEEC_SUCCESS: success
- *                     other: failure
- */
-TEEC_Result TEEC_RegisterSharedMemoryHidl(TEEC_ContextHidl *context, TEEC_SharedMemoryHidl *sharedMem)
+#define ALLOCATE 0
+#define REGISTER 1
+static TEEC_Result CheckSharedMemoryParam(const TEEC_ContextHidl *context, const TEEC_SharedMemoryHidl *sharedMem,
+                                        int shrMemType)
 {
     /* First, check parameters is valid or not */
     if ((context == NULL) || (sharedMem == NULL)) {
-        tloge("register shardmem hidl: context or sharedMem is NULL\n");
+        tloge("allocate shardmem hidl: context or sharedMem is NULL\n");
         return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
     }
 
-    bool condition =
-        (sharedMem->buffer == NULL) || ((sharedMem->flags != TEEC_MEM_INPUT) && (sharedMem->flags != TEEC_MEM_OUTPUT) &&
-                                        (sharedMem->flags != TEEC_MEM_INOUT) &&
-                                        (sharedMem->flags != TEEC_MEM_SHARED_INOUT));
+    bool condition = (sharedMem->flags != TEEC_MEM_INPUT) && (sharedMem->flags != TEEC_MEM_OUTPUT) &&
+                    (sharedMem->flags != TEEC_MEM_INOUT) && (sharedMem->flags != TEEC_MEM_SHARED_INOUT);
+    if (shrMemType == ALLOCATE) {
+        condition = condition && (sharedMem->flags != TEEC_MEM_REGISTER_INOUT);
+    } else if (shrMemType == REGISTER) {
+        condition = condition || (sharedMem->buffer == NULL);
+    }
+
     if (condition) {
-        tloge("register shardmem hidl: sharedMem->flags wrong\n");
+        tloge("allocate shardmem hidl: sharedMem->flags wrong\n");
         return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
+    }
+
+    return TEEC_SUCCESS;
+}
+
+TEEC_Result TEEC_RegisterSharedMemoryHidl(TEEC_ContextHidl *context, TEEC_SharedMemoryHidl *sharedMem)
+{
+    /* First, check parameters is valid or not */
+    TEEC_Result ret = CheckSharedMemoryParam(context, sharedMem, REGISTER);
+    if (ret != TEEC_SUCCESS) {
+        tloge("register sharedmem hidl: sharedMem->flags wrong\n");
+        return ret;
     }
 
     /* Paramters all right, start execution */
@@ -1241,6 +1272,14 @@ TEEC_Result TEEC_RegisterSharedMemoryHidl(TEEC_ContextHidl *context, TEEC_Shared
     return TEEC_SUCCESS;
 }
 
+/* Function:     TEEC_RegisterSharedMemory
+*  Description:  This function registers a block of existing Client Application memory
+*                      as a block of Shared Memory within the scope of the specified TEE Context.
+*  Parameters:    context: a pointer to an initialized TEE Context.
+*                 sharedMem: a pointer to a shared Memory structure to register.
+*  Return:       TEEC_SUCCESS: success
+*                other: failure
+*/
 TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context *context, TEEC_SharedMemory *sharedMem)
 {
     TEEC_Result ret;
@@ -1294,24 +1333,6 @@ static void RelaseBufferAndClearBit(TEEC_ContextHidl *context, TEEC_SharedMemory
     sharedMem->offset = 0;
 }
 
-static TEEC_Result CheckSharedMemoryParam(const TEEC_ContextHidl *context, const TEEC_SharedMemoryHidl *sharedMem)
-{
-    /* First, check parameters is valid or not */
-    if ((context == NULL) || (sharedMem == NULL)) {
-        tloge("allocate shardmem hidl: context or sharedMem is NULL\n");
-        return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
-    }
-
-    bool condition = (sharedMem->flags != TEEC_MEM_INPUT) && (sharedMem->flags != TEEC_MEM_OUTPUT) &&
-                     (sharedMem->flags != TEEC_MEM_INOUT) && (sharedMem->flags != TEEC_MEM_SHARED_INOUT);
-    if (condition) {
-        tloge("allocate shardmem hidl: sharedMem->flags wrong\n");
-        return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
-    }
-
-    return TEEC_SUCCESS;
-}
-
 static TEEC_Result AllocateSharedMem(TEEC_SharedMemoryHidl *sharedMem)
 {
     errno_t rc;
@@ -1344,7 +1365,7 @@ TEEC_Result TEEC_AllocateSharedMemoryHidl(TEEC_ContextHidl *context, TEEC_Shared
 {
     TEEC_Result ret;
 
-    ret = CheckSharedMemoryParam(context, sharedMem);
+    ret = CheckSharedMemoryParam(context, sharedMem, ALLOCATE);
     if (ret != TEEC_SUCCESS) {
         return ret;
     }
@@ -1360,7 +1381,7 @@ TEEC_Result TEEC_AllocateSharedMemoryHidl(TEEC_ContextHidl *context, TEEC_Shared
     }
 
     sharedMem->offset = (uint32_t)validBit;
-    if (sharedMem->flags == TEEC_MEM_SHARED_INOUT) {
+    if (sharedMem->flags == TEEC_MEM_SHARED_INOUT || sharedMem->flags == TEEC_MEM_REGISTER_INOUT) {
         ret = AllocateSharedMem(sharedMem);
         if (ret != TEEC_SUCCESS) {
             ClearBitWithLock(&context->shrMemBitMapLock, sharedMem->offset,
@@ -1629,7 +1650,7 @@ TEEC_Result TEEC_CheckOperation(const TEEC_Operation *operation)
                 ret = (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
                 break;
             }
-        } else if (paramType[paramCnt] == TEEC_NONE || paramType[paramCnt] == TEEC_MEMREF_SHARED_INOUT) {
+        } else if (paramType[paramCnt] == TEEC_NONE || IS_SHARED_MEM(paramType[paramCnt])) {
             /*  if type is none, ignore it */
         } else {
             tloge("paramType is not support\n");

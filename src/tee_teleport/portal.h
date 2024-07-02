@@ -20,7 +20,6 @@
 
 #include "cgroup_util.h"
 #ifdef CROSS_DOMAIN_PERF
-#include "posix_proxy.h"
 #include "tc_ns_client.h"
 #endif
 
@@ -58,8 +57,6 @@ enum TeeInstallUninstallType {
     JAVA_RUNTIME,
     PYTHON_THIRD_PARTY,
     APPLICATION,
-    INPUT_CODE,
-    CGROUP_CONFIGER,
     INV_INSTALL_UNINSTALL_TYPE,
 };
 
