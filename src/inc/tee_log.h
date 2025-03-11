@@ -13,6 +13,10 @@
 #ifndef TEE_LOG_H
 #define TEE_LOG_H
 
+#if (defined CONFIG_CUSTOM_LOGGING)
+#include "tee_custom_log.h"
+#else
 #include "tee_sys_log.h"
+#endif
 
 #endif
