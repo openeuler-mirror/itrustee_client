@@ -1170,7 +1170,7 @@ static void FileAccessWork(struct SecStorageType *transControl)
         if (JoinFileName((char *)(transControl->args.access.name), isBackup, nameBuff, sizeof(nameBuff)) == 0) {
             ret = access(nameBuff, transControl->args.access.mode);
             if (ret < 0) {
-                tloge("access file mode %d failed: %d\n", transControl->args.access.mode, errno);
+                tlogw("access file mode %d failed: %d\n", transControl->args.access.mode, errno);
             }
             transControl->ret   = ret;
             transControl->error = (uint32_t)errno;
@@ -1180,7 +1180,7 @@ static void FileAccessWork(struct SecStorageType *transControl)
     } else {
         ret = access((char *)(transControl->args.access.name), transControl->args.access.mode);
         if (ret < 0) {
-            tloge("access2 file mode %d failed: %d\n", transControl->args.access.mode, errno);
+            tlogw("access2 file mode %d failed: %d\n", transControl->args.access.mode, errno);
         }
         transControl->ret   = ret;
         transControl->error = (uint32_t)errno;
