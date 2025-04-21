@@ -1372,20 +1372,20 @@ TEEC_Result TEEC_AllocateSharedMemoryHidl(TEEC_ContextHidl *context, TEEC_Shared
 
     /* Paramters all right, start execution */
     sharedMem->buffer = NULL;
+    bool isZeroCopyMem = (sharedMem->flags == TEEC_MEM_SHARED_INOUT || sharedMem->flags == TEEC_MEM_REGISTER_INOUT);
+    if (!isZeroCopyMem) {
+        int32_t validBit = GetAndSetBitWithLock(&context->shrMemBitMapLock, context->shm_bitmap,
+                                                sizeof(context->shm_bitmap));
+        if (validBit < 0) {
+            tloge("get valid bit for shm failed\n");
+            return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
+        }
 
-    int32_t validBit = GetAndSetBitWithLock(&context->shrMemBitMapLock, context->shm_bitmap,
-                                            sizeof(context->shm_bitmap));
-    if (validBit < 0) {
-        tloge("get valid bit for shm failed\n");
-        return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
+        sharedMem->offset = (uint32_t)validBit;
     }
-
-    sharedMem->offset = (uint32_t)validBit;
-    if (sharedMem->flags == TEEC_MEM_SHARED_INOUT || sharedMem->flags == TEEC_MEM_REGISTER_INOUT) {
+    if (isZeroCopyMem) {
         ret = AllocateSharedMem(sharedMem);
         if (ret != TEEC_SUCCESS) {
-            ClearBitWithLock(&context->shrMemBitMapLock, sharedMem->offset,
-                             sizeof(context->shm_bitmap), context->shm_bitmap);
             return ret;
         }
     } else if (sharedMem->size != 0) {
