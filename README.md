@@ -1,7 +1,7 @@
 # iTrustee client
 
 #### 介绍
-该目录下文件包含5个功能组件，分别是:libteec.so、teecd、tlogcat、tee_teleport、agentd. libteec.so、teecd，用于REE与TEE的通信。其中libteec.so是动态链接库；teecd是可执行文件; tlogcat 用于日志输出存储；tee_teleport 用于高级语言功能；agentd 用于容器中安全存储等功能的使用。
+该目录下文件包含5个功能组件，分别是:libteec.so、teecd、tlogcat、tee_teleport、agentd、libteec.so、teecd，用于REE与TEE的通信。其中libteec.so是动态链接库；teecd是可执行文件; tlogcat 用于日志输出存储；tee_teleport 用于高级语言功能；agentd 用于容器中安全存储等功能的使用。
 
 #### 操作系统
 支持ARM服务器，比如鲲鹏920。
