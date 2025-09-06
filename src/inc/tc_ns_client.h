@@ -12,7 +12,7 @@
 
 #ifndef _TC_NS_CLIENT_H_
 #define _TC_NS_CLIENT_H_
-#include "tc_ns_client.h"
+#include "tee_client_inner.h"
 #include "tee_client_type.h"
 #define TC_DEBUG
 
