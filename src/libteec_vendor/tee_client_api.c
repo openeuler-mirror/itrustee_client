@@ -939,7 +939,7 @@ TEEC_Result TEEC_OpenSessionHidl(int callingPid, const TaFileInfo *taFile, TEEC_
         operation->paramTypes = TEEC_PARAM_TYPES(TEEC_PARAM_TYPE_GET(operation->paramTypes, 0),
                                                  TEEC_PARAM_TYPE_GET(operation->paramTypes, 1), TEEC_NONE, TEEC_NONE);
     }
-    teecRet = TEEC_CheckOperation(operation);
+    teecRet = TEEC_CheckOperation(context, operation);
     if (teecRet != TEEC_SUCCESS) {
         tloge("operation is invalid\n");
         goto ERROR;
@@ -1146,7 +1146,7 @@ static TEEC_Result CheckRegisterShm(const TEEC_Operation *operation)
  * Return:         TEEC_SUCCESS: success
  *                     other: failure
  */
-TEEC_Result TEEC_InvokeCommandHidl(const TEEC_ContextHidl *context, const TEEC_Session *session, uint32_t commandID,
+TEEC_Result TEEC_InvokeCommandHidl(TEEC_ContextHidl *context, const TEEC_Session *session, uint32_t commandID,
                                 TEEC_Operation *operation, uint32_t *returnOrigin)
 {
     TEEC_Result teecRet = (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
@@ -1158,7 +1158,7 @@ TEEC_Result TEEC_InvokeCommandHidl(const TEEC_ContextHidl *context, const TEEC_S
     if ((session == NULL) || (context == NULL)) {
         goto ERROR;
     }
-    teecRet = TEEC_CheckOperation(operation);
+    teecRet = TEEC_CheckOperation(context, operation);
     if (teecRet != TEEC_SUCCESS) {
         tloge("operation is invalid\n");
         goto ERROR;
@@ -1566,7 +1566,36 @@ static TEEC_Result TEEC_CheckTmpRef(TEEC_TempMemoryReference tmpref)
     return (TEEC_Result)TEEC_SUCCESS;
 }
 
-static TEEC_Result TEEC_CheckMemRef(TEEC_RegisteredMemoryReference memref, uint32_t paramType)
+static bool CheckSharedBufferExist(TEEC_ContextHidl *context, const TEEC_RegisteredMemoryReference *sharedMem)
+{
+    if (context == NULL) {
+        return false;
+    }
+ 
+    struct ListNode *ptr = NULL;
+    TEEC_SharedMemoryHidl *tempSharedMem = NULL;
+    TEEC_SharedMemory *shm = sharedMem->parent;
+ 
+    int lockRet = pthread_mutex_lock(&context->shrMemLock);
+    if (lockRet != 0) {
+        tloge("get share mem lock failed\n");
+        return false;
+    }
+ 
+    LIST_FOR_EACH(ptr, &context->shrd_mem_list)
+    {
+        tempSharedMem = CONTAINER_OF(ptr, TEEC_SharedMemoryHidl, head);
+        if (tempSharedMem->buffer == shm->buffer) {
+            (void)pthread_mutex_unlock(&context->shrMemLock);
+            return true;
+        }
+    }
+ 
+    (void)pthread_mutex_unlock(&context->shrMemLock);
+    return false;
+}
+
+static TEEC_Result TEEC_CheckMemRef(TEEC_ContextHidl *context, TEEC_RegisteredMemoryReference memref, uint32_t paramType)
 {
     bool condition = (memref.parent == NULL) || (memref.parent->buffer == NULL);
     if (condition) {
@@ -1605,6 +1634,12 @@ static TEEC_Result TEEC_CheckMemRef(TEEC_RegisteredMemoryReference memref, uint3
         }
     }
 
+    if (memref.parent->is_allocated) {
+        if (!CheckSharedBufferExist(context, &memref)) {
+            return (TEEC_Result)TEEC_ERROR_BAD_PARAMETERS;
+        }
+    }
+
     return (TEEC_Result)TEEC_SUCCESS;
 PARAM_ERROR:
     tloge("type of memref not belong to the parent flags\n");
@@ -1618,7 +1653,7 @@ PARAM_ERROR:
  * Return:         TEEC_SUCCESS: success
  *                     other: failure
  */
-TEEC_Result TEEC_CheckOperation(const TEEC_Operation *operation)
+TEEC_Result TEEC_CheckOperation(TEEC_ContextHidl *context, const TEEC_Operation *operation)
 {
     uint32_t paramType[TEEC_PARAM_NUM];
     uint32_t paramCnt;
@@ -1642,7 +1677,7 @@ TEEC_Result TEEC_CheckOperation(const TEEC_Operation *operation)
         if (IS_TEMP_MEM(paramType[paramCnt])) {
             ret = TEEC_CheckTmpRef(operation->params[paramCnt].tmpref);
         } else if (IS_PARTIAL_MEM(paramType[paramCnt])) {
-            ret = TEEC_CheckMemRef(operation->params[paramCnt].memref, paramType[paramCnt]);
+            ret = TEEC_CheckMemRef(context, operation->params[paramCnt].memref, paramType[paramCnt]);
         } else if (IS_VALUE_MEM(paramType[paramCnt])) {
             /*  if type is value, ignore it */
         } else if (checkValue == true) {
@@ -1692,7 +1727,10 @@ void TEEC_RequestCancellation(TEEC_Operation *operation)
         tloge("session is invalid\n");
         return;
     }
-    teecRet = TEEC_CheckOperation(operation);
+
+    TEEC_ContextHidl *contextInner = GetBnContext(session->context);
+    teecRet = TEEC_CheckOperation(contextInner, operation);
+    (void)PutBnContext(contextInner);
     if (teecRet != TEEC_SUCCESS) {
         tloge("operation is invalid\n");
         return;
