@@ -12,6 +12,7 @@
 
 #ifndef _TC_NS_CLIENT_H_
 #define _TC_NS_CLIENT_H_
+#include "tee_client_inner.h"
 #include "tee_client_type.h"
 #define TC_DEBUG
 
@@ -183,5 +184,5 @@ struct AgentIoctlArgs {
 #define TC_NS_CLIENT_IOCTL_GET_TEE_INFO                   _IOWR(TC_NS_CLIENT_IOC_MAGIC, 26, TC_NS_TEE_Info)
 #define TC_NS_CLIENT_IOCTL_CHECK_CCOS                     _IOWR(TC_NS_CLIENT_IOC_MAGIC, 32, unsigned int)
 
-TEEC_Result TEEC_CheckOperation(const TEEC_Operation *operation);
+TEEC_Result TEEC_CheckOperation(TEEC_ContextHidl *context, const TEEC_Operation *operation);
 #endif
